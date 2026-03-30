@@ -2,23 +2,19 @@
   "entities": {
     "Availability": {
       "title": "Availability",
-      "description": "Weekly availability slots for the tutor",
+      "description": "Granular availability slots for the tutor",
       "type": "object",
       "properties": {
         "dayOfWeek": {
           "type": "number",
           "description": "0-6 (Sunday-Saturday)"
         },
-        "startTime": {
-          "type": "string",
-          "description": "HH:mm format"
-        },
-        "endTime": {
-          "type": "string",
-          "description": "HH:mm format"
+        "hour": {
+          "type": "number",
+          "description": "Hour of the day (0-23)"
         }
       },
-      "required": ["dayOfWeek", "startTime", "endTime"]
+      "required": ["dayOfWeek", "hour"]
     },
     "Appointment": {
       "title": "Appointment",

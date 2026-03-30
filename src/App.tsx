@@ -240,21 +240,14 @@ function SchedulingApp() {
 
     const slots: Date[] = [];
     dayAvailability.forEach(avail => {
-      const [startH, startM] = avail.startTime.split(":").map(Number);
-      const [endH, endM] = avail.endTime.split(":").map(Number);
+      const current = setMinutes(setHours(date, avail.hour), 0);
       
-      let current = setMinutes(setHours(date, startH), startM);
-      const end = setMinutes(setHours(date, endH), endM);
-
-      while (isBefore(current, end)) {
-        if (!isPast(addMinutes(current, 50))) {
-          slots.push(current);
-        }
-        current = addHours(current, 1);
+      if (!isPast(addMinutes(current, 50))) {
+        slots.push(current);
       }
     });
 
-    return slots;
+    return slots.sort((a, b) => a.getTime() - b.getTime());
   };
 
   const availableSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate, availability]);
@@ -297,34 +290,21 @@ function SchedulingApp() {
     }
   };
 
-  const addAvailability = async (day: number) => {
+  const toggleAvailability = async (day: number, hour: number) => {
+    const existing = availability.find(a => a.dayOfWeek === day && a.hour === hour);
     const path = "availability";
+    
     try {
-      await addDoc(collection(db, path), {
-        dayOfWeek: day,
-        startTime: "09:00",
-        endTime: "17:00"
-      });
+      if (existing) {
+        await deleteDoc(doc(db, path, existing.id));
+      } else {
+        await addDoc(collection(db, path), {
+          dayOfWeek: day,
+          hour: hour
+        });
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
-    }
-  };
-
-  const removeAvailability = async (id: string) => {
-    const path = `availability/${id}`;
-    try {
-      await deleteDoc(doc(db, "availability", id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, path);
-    }
-  };
-
-  const updateAvailabilityField = async (id: string, field: keyof Availability, value: any) => {
-    const path = `availability/${id}`;
-    try {
-      await updateDoc(doc(db, "availability", id), { [field]: value });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, path);
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
@@ -620,103 +600,52 @@ function SchedulingApp() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Availability Settings */}
-                <div className="lg:col-span-1 space-y-6">
-                  <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                    <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">Weekly Availability</h2>
-                    <div className="space-y-6">
-                      {[1, 2, 3, 4, 5, 6, 0].map(day => {
-                        const dayAvails = availability.filter(a => a.dayOfWeek === day);
-                        return (
-                          <div key={day} className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-bold text-slate-900">{format(addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), day), "EEEE")}</span>
-                              <button 
-                                onClick={() => addAvailability(day)}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
-                            {dayAvails.length > 0 ? (
-                              <div className="space-y-2">
-                                {dayAvails.map(avail => (
-                                  <div key={avail.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                    <input 
-                                      type="time" 
-                                      value={avail.startTime}
-                                      onChange={(e) => updateAvailabilityField(avail.id, "startTime", e.target.value)}
-                                      className="bg-transparent text-xs font-bold outline-none"
-                                    />
-                                    <span className="text-slate-300">-</span>
-                                    <input 
-                                      type="time" 
-                                      value={avail.endTime}
-                                      onChange={(e) => updateAvailabilityField(avail.id, "endTime", e.target.value)}
-                                      className="bg-transparent text-xs font-bold outline-none"
-                                    />
-                                    <button 
-                                      onClick={() => removeAvailability(avail.id)}
-                                      className="ml-auto text-slate-400 hover:text-red-500"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-slate-400 italic">No availability</div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+              <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                    Availability Grid
+                  </h3>
+                  <div className="text-xs text-slate-400 font-medium italic">
+                    Changes are saved automatically.
                   </div>
                 </div>
-
-                {/* Appointments List (Fallback for mobile/detailed view) */}
-                <div className="lg:col-span-2 space-y-6">
-                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                      <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">All Upcoming Classes</h2>
-                      <div className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-[10px] font-bold">
-                        {appointments.length} Total
-                      </div>
-                    </div>
-                    <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto custom-scrollbar">
-                      {appointments.length > 0 ? (
-                        appointments
-                          .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-                          .map(app => (
-                            <div key={app.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-slate-100 rounded-xl flex flex-col items-center justify-center text-slate-500">
-                                  <span className="text-[10px] font-bold uppercase">{format(app.startTime, "MMM")}</span>
-                                  <span className="text-lg font-bold leading-none">{format(app.startTime, "d")}</span>
-                                </div>
-                                <div>
-                                  <div className="font-bold text-slate-900">{app.studentName}</div>
-                                  <div className="text-xs text-slate-500 flex items-center gap-3 mt-1">
-                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {format(app.startTime, "HH:mm")} - {format(app.endTime, "HH:mm")}</span>
-                                    <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {app.studentPhone}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <button 
-                                onClick={() => removeAppointment(app.id)}
-                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            </div>
-                          ))
-                      ) : (
-                        <div className="p-12 text-center text-slate-400">
-                          <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                          <p>No appointments booked yet.</p>
+                
+                <div className="overflow-x-auto no-scrollbar">
+                  <div className="min-w-[800px]">
+                    <div className="grid grid-cols-8 gap-2 mb-4">
+                      <div className="w-20" /> {/* Hour label column */}
+                      {[1, 2, 3, 4, 5, 6, 0].map(day => (
+                        <div key={day} className="text-center font-bold text-xs uppercase tracking-widest text-slate-400">
+                          {format(addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), day), "EEE")}
                         </div>
-                      )}
+                      ))}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {Array.from({ length: 16 }, (_, i) => i + 7).map(hour => (
+                        <div key={hour} className="grid grid-cols-8 gap-2 items-center">
+                          <div className="text-right pr-4 text-[10px] font-bold text-slate-400">
+                            {format(setHours(new Date(), hour), "HH:00")}
+                          </div>
+                          {[1, 2, 3, 4, 5, 6, 0].map(day => {
+                            const isActive = availability.some(a => a.dayOfWeek === day && a.hour === hour);
+                            return (
+                              <button
+                                key={day}
+                                onClick={() => toggleAvailability(day, hour)}
+                                className={`h-10 rounded-xl border transition-all ${
+                                  isActive 
+                                    ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100" 
+                                    : "bg-slate-50 border-slate-100 hover:border-blue-200"
+                                }`}
+                              >
+                                {isActive && <Check className="w-4 h-4 mx-auto" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

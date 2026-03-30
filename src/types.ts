@@ -10,8 +10,7 @@ export interface TimeSlot {
 export interface Availability {
   id: string;
   dayOfWeek: number; // 0-6 (Sunday-Saturday)
-  startTime: string; // "HH:mm"
-  endTime: string; // "HH:mm"
+  hour: number; // 0-23
 }
 
 export interface Appointment {
