@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Availability": {
+      "title": "Availability",
+      "description": "Weekly availability slots for the tutor",
+      "type": "object",
+      "properties": {
+        "dayOfWeek": {
+          "type": "number",
+          "description": "0-6 (Sunday-Saturday)"
+        },
+        "startTime": {
+          "type": "string",
+          "description": "HH:mm format"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "HH:mm format"
+        }
+      },
+      "required": ["dayOfWeek", "startTime", "endTime"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A booked class by a student",
+      "type": "object",
+      "properties": {
+        "studentName": {
+          "type": "string",
+          "description": "Full name of the student"
+        },
+        "studentPhone": {
+          "type": "string",
+          "description": "Phone number of the student"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start time of the class"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End time of the class"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["booked", "cancelled"],
+          "description": "Status of the appointment"
+        }
+      },
+      "required": ["studentName", "studentPhone", "startTime", "endTime", "status"]
+    }
+  },
+  "firestore": {
+    "/availability/{availabilityId}": {
+      "schema": "Availability",
+      "description": "Tutor's weekly availability settings"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Student bookings"
+    }
+  }
+}
