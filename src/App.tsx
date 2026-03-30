@@ -281,7 +281,7 @@ function SchedulingApp() {
       });
 
       // WhatsApp Notification
-      const message = `Olá Lucas! Novo agendamento de aula de Inglês:\n\n👤 Aluno: ${studentInfo.name}\n📞 WhatsApp: ${studentInfo.phone}\n📅 Data: ${format(selectedSlot, "EEEE, d 'de' MMMM")}\n⏰ Horário: ${format(selectedSlot, "HH:mm")}`;
+      const message = `Hey Lucas, this time and date suits me ${format(selectedSlot, "EEEE, d MMMM").toLowerCase()} at ${format(selectedSlot, "HH:mm")}`;
       const waUrl = `https://wa.me/5592981432135?text=${encodeURIComponent(message)}`;
       window.open(waUrl, "_blank");
 
@@ -393,7 +393,7 @@ function SchedulingApp() {
                         type="text" 
                         value={studentInfo.name}
                         onChange={(e) => setStudentInfo({ ...studentInfo, name: e.target.value })}
-                        placeholder="João Silva"
+                        placeholder="Your Name"
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       />
                     </div>
@@ -406,7 +406,7 @@ function SchedulingApp() {
                         type="tel" 
                         value={studentInfo.phone}
                         onChange={(e) => setStudentInfo({ ...studentInfo, phone: e.target.value })}
-                        placeholder="(92) 98143-2135"
+                        placeholder="Your WhatsApp number"
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       />
                     </div>
