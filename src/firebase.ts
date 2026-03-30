@@ -4,10 +4,7 @@ import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-const databaseId = (firebaseConfig as any).firestoreDatabaseId;
-export const db = (databaseId && databaseId !== "(default)") 
-  ? getFirestore(app, databaseId) 
-  : getFirestore(app);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth(app);
 
 export enum OperationType {

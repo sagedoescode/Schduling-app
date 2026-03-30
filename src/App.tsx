@@ -162,6 +162,19 @@ function SchedulingApp() {
   const [studentInfo, setStudentInfo] = useState({ name: "", phone: "" });
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          toast.error("Firebase connection failed. Please check your configuration.");
+        }
+      }
+    };
+    testConnection();
+  }, []);
+
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
 
@@ -646,7 +659,6 @@ function SchedulingApp() {
                           </div>
                           {[1, 2, 3, 4, 5, 6, 0].map(day => {
                             const isActive = availability.some(a => a.dayOfWeek === day && a.hour === hour);
-                            const isPending = pendingSlots.has(`${day}-${hour}`);
                             return (
                               <button
                                 key={day}
@@ -655,7 +667,7 @@ function SchedulingApp() {
                                   isActive 
                                     ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100" 
                                     : "bg-slate-50 border-slate-100 hover:border-blue-200"
-                                } ${isPending ? "opacity-70" : ""}`}
+                                }`}
                               >
                                 {isActive && <Check className="w-4 h-4 mx-auto" />}
                               </button>
