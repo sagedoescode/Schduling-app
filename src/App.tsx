@@ -485,7 +485,7 @@ function SchedulingApp() {
 
                 <div className="bg-white rounded-3xl border border-slate-200 p-6">
                   <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6 flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> Available Slots (50 min each)
+                    <Clock className="w-4 h-4" /> Available Slots
                   </h2>
                   
                   {availableSlots.length > 0 ? (
