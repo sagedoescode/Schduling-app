@@ -33,13 +33,7 @@ import {
   setMinutes,
   addHours
 } from "date-fns";
-// Convert local day/hour to UTC day/hour
-const localToUtc = (localDay: number, localHour: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + (localDay - d.getDay()));
-  d.setHours(localHour, 0, 0, 0);
-  return { day: d.getUTCDay(), hour: d.getUTCHours() };
-};
+import { TZDate } from "@date-fns/tz";
 import { 
   collection, 
   onSnapshot, 
@@ -162,6 +156,23 @@ const BookLogo = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
 };
 
 function SchedulingApp() {
+  const [tz, setTz] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+  useEffect(() => {
+    fetch("https://ipapi.co/timezone/")
+      .then(r => r.text())
+      .then(detected => { if (detected && detected.includes("/")) setTz(detected); })
+      .catch(() => {});
+  }, []);
+
+  const nowLocal = () => new TZDate(new Date(), tz);
+  const toLocal = (date: Date) => new TZDate(date, tz);
+  const localToUtc = (localDay: number, localHour: number) => {
+    const base = nowLocal();
+    const target = setMinutes(setHours(addDays(startOfWeek(base, { weekStartsOn: 0 }), localDay), localHour), 0);
+    return { day: target.getUTCDay(), hour: target.getUTCHours() };
+  };
+
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [view, setView] = useState<"student" | "admin">("student");
   const [adminTab, setAdminTab] = useState<"schedule" | "availability">("schedule");
@@ -208,8 +219,8 @@ function SchedulingApp() {
         return {
           id: doc.id,
           ...d,
-          startTime: new Date(d.startTime),
-          endTime: new Date(d.endTime)
+          startTime: toLocal(new Date(d.startTime)),
+          endTime: toLocal(new Date(d.endTime))
         } as Appointment;
       });
       setAppointments(data);
@@ -246,17 +257,18 @@ function SchedulingApp() {
   };
 
   const weekDays = useMemo(() => {
-    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const start = startOfWeek(nowLocal(), { weekStartsOn: 1 });
     return eachDayOfInterval({
       start,
       end: addDays(start, 6)
     });
-  }, []);
+  }, [tz]);
 
   const generateTimeSlots = (date: Date) => {
+    const tzDate = toLocal(date);
     const slots: Date[] = [];
     for (let h = 0; h < 24; h++) {
-      const slotDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 0, 0, 0);
+      const slotDate = setMinutes(setHours(tzDate, h), 0);
       const utcDay = slotDate.getUTCDay();
       const utcHour = slotDate.getUTCHours();
 
@@ -269,7 +281,7 @@ function SchedulingApp() {
     return slots;
   };
 
-  const availableSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate, availability]);
+  const availableSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate, availability, tz]);
 
   const handleSchedule = async () => {
     if (!selectedSlot || !studentInfo.name || !studentInfo.phone) return;
@@ -448,7 +460,7 @@ function SchedulingApp() {
                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                   {weekDays.map((day, i) => {
                     const isSelected = isSameDay(day, selectedDate);
-                    const isToday = isSameDay(day, new Date());
+                    const isToday = isSameDay(day, nowLocal());
                     return (
                       <button
                         key={i}
@@ -596,7 +608,7 @@ function SchedulingApp() {
                 
                 <div className="grid grid-cols-7 min-w-[800px] gap-4">
                   {[0, 1, 2, 3, 4, 5, 6].map((dayOffset) => {
-                    const date = addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), dayOffset);
+                    const date = addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), dayOffset);
                     const dayAppointments = appointments.filter(app => 
                       isSameDay(app.startTime, date)
                     );
@@ -652,7 +664,7 @@ function SchedulingApp() {
                       <div className="w-20" /> {/* Hour label column */}
                       {[1, 2, 3, 4, 5, 6, 0].map(day => (
                         <div key={day} className="text-center font-bold text-xs uppercase tracking-widest text-slate-400">
-                          {format(addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), day), "EEE")}
+                          {format(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEE")}
                         </div>
                       ))}
                     </div>
@@ -661,7 +673,7 @@ function SchedulingApp() {
                       {Array.from({ length: 16 }, (_, i) => i + 7).map(hour => (
                         <div key={hour} className="grid grid-cols-8 gap-2 items-center">
                           <div className="text-right pr-4 text-[10px] font-bold text-slate-400">
-                            {format(setHours(new Date(), hour), "HH:00")}
+                            {format(setHours(nowLocal(), hour), "HH:00")}
                           </div>
                           {[1, 2, 3, 4, 5, 6, 0].map(day => {
                             const { day: utcDay, hour: utcHour } = localToUtc(day, hour);
