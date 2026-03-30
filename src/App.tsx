@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { Toaster, toast } from "sonner";
 import { 
   Calendar, 
   Clock, 
@@ -290,9 +291,17 @@ function SchedulingApp() {
     }
   };
 
+  const [pendingSlots, setPendingSlots] = useState<Set<string>>(new Set());
+
   const toggleAvailability = async (day: number, hour: number) => {
+    const slotKey = `${day}-${hour}`;
+    if (pendingSlots.has(slotKey)) return;
+
     const existing = availability.find(a => a.dayOfWeek === day && a.hour === hour);
     const path = "availability";
+    
+    setPendingSlots(prev => new Set(prev).add(slotKey));
+    const toastId = toast.loading("Saving availability...");
     
     try {
       if (existing) {
@@ -303,8 +312,16 @@ function SchedulingApp() {
           hour: hour
         });
       }
+      toast.success("Availability updated", { id: toastId });
     } catch (error) {
+      toast.error("Failed to update availability", { id: toastId });
       handleFirestoreError(error, OperationType.WRITE, path);
+    } finally {
+      setPendingSlots(prev => {
+        const next = new Set(prev);
+        next.delete(slotKey);
+        return next;
+      });
     }
   };
 
@@ -630,17 +647,22 @@ function SchedulingApp() {
                           </div>
                           {[1, 2, 3, 4, 5, 6, 0].map(day => {
                             const isActive = availability.some(a => a.dayOfWeek === day && a.hour === hour);
+                            const isPending = pendingSlots.has(`${day}-${hour}`);
                             return (
                               <button
                                 key={day}
+                                disabled={isPending}
                                 onClick={() => toggleAvailability(day, hour)}
                                 className={`h-10 rounded-xl border transition-all ${
                                   isActive 
                                     ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100" 
                                     : "bg-slate-50 border-slate-100 hover:border-blue-200"
-                                }`}
+                                } ${isPending ? "opacity-50 cursor-wait" : ""}`}
                               >
-                                {isActive && <Check className="w-4 h-4 mx-auto" />}
+                                {isActive && !isPending && <Check className="w-4 h-4 mx-auto" />}
+                                {isPending && (
+                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+                                )}
                               </button>
                             );
                           })}
@@ -661,6 +683,7 @@ function SchedulingApp() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <Toaster position="top-center" richColors />
       <SchedulingApp />
     </ErrorBoundary>
   );
