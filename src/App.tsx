@@ -43,7 +43,8 @@ import {
   where,
   getDoc,
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocFromServer
 } from "firebase/firestore";
 import { 
   signInWithPopup, 
@@ -102,46 +103,53 @@ class ErrorBoundary extends Component<any, any> {
 }
 
 const BookLogo = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
-  const width = size === "lg" ? "w-16" : "w-7";
-  const height = size === "lg" ? "h-11" : "h-5";
-  const diamondSize = size === "lg" ? "w-6 h-6" : "w-2.5 h-2.5";
-  const circleSize = size === "lg" ? "w-3.5 h-3.5" : "w-1.5 h-1.5";
-  const starSize = size === "lg" ? "w-[2px] h-[2px]" : "w-[1px] h-[1px]";
-  const starGap = size === "lg" ? "gap-[2px]" : "gap-[1px]";
-  const starPadding = size === "lg" ? "p-[2px]" : "p-[1px]";
-
+  const s = size === "lg" ? 48 : 24;
   return (
-    <div className={`flex ${width} ${height} gap-[1px] shadow-sm`}>
-      {/* Left Page - Brazil */}
-      <div className="flex-1 bg-[#009b3a] rounded-l-[2px] relative overflow-hidden flex items-center justify-center">
-        <div className={`${diamondSize} bg-[#fedf00] rotate-45`}></div>
-        <div className={`absolute ${circleSize} bg-[#002776] rounded-full`}></div>
-        {/* Spine shadow */}
-        <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-black/10"></div>
-      </div>
+    <svg 
+      width={s} 
+      height={s} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      className="drop-shadow-sm"
+    >
+      <defs>
+        <clipPath id="leftPage">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+        </clipPath>
+        <clipPath id="rightPage">
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </clipPath>
+      </defs>
+      
+      {/* Left Page - Transparent */}
+      <g clipPath="url(#leftPage)">
+        <rect x="2" y="3" width="10" height="18" fill="none" />
+      </g>
+      
       {/* Right Page - USA */}
-      <div className="flex-1 bg-white rounded-r-[2px] relative overflow-hidden flex flex-col">
-        <div className="h-[20%] w-full bg-[#b22234]"></div>
-        <div className="h-[20%] w-full bg-white"></div>
-        <div className="h-[20%] w-full bg-[#b22234]"></div>
-        <div className="h-[20%] w-full bg-white"></div>
-        <div className="h-[20%] w-full bg-[#b22234]"></div>
-        <div className={`absolute top-0 left-0 w-1/2 h-1/2 bg-[#3c3b6e] flex flex-wrap ${starPadding} ${starGap} content-start`}>
-          <div className={`${starSize} bg-white rounded-full`}></div>
-          <div className={`${starSize} bg-white rounded-full`}></div>
-          <div className={`${starSize} bg-white rounded-full`}></div>
-          {size === "lg" && (
-            <>
-              <div className={`${starSize} bg-white rounded-full`}></div>
-              <div className={`${starSize} bg-white rounded-full`}></div>
-              <div className={`${starSize} bg-white rounded-full`}></div>
-            </>
-          )}
-        </div>
-        {/* Spine shadow */}
-        <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-black/10"></div>
-      </div>
-    </div>
+      <g clipPath="url(#rightPage)">
+        <rect x="12" y="3" width="10" height="18" fill="white" />
+        <rect x="12" y="3" width="10" height="1.5" fill="#b22234" />
+        <rect x="12" y="6" width="10" height="1.5" fill="#b22234" />
+        <rect x="12" y="9" width="10" height="1.5" fill="#b22234" />
+        <rect x="12" y="12" width="10" height="1.5" fill="#b22234" />
+        <rect x="12" y="15" width="10" height="1.5" fill="#b22234" />
+        <rect x="12" y="18" width="10" height="1.5" fill="#b22234" />
+        
+        <rect x="12" y="3" width="5" height="6" fill="#3c3b6e" />
+        {/* USA Stars */}
+        <circle cx="13.5" cy="4.5" r="0.25" fill="white" />
+        <circle cx="15.5" cy="4.5" r="0.25" fill="white" />
+        <circle cx="14.5" cy="6" r="0.25" fill="white" />
+        <circle cx="13.5" cy="7.5" r="0.25" fill="white" />
+        <circle cx="15.5" cy="7.5" r="0.25" fill="white" />
+      </g>
+      
+      {/* Outline with blue stroke to match UI */}
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 };
 
@@ -157,6 +165,17 @@ function SchedulingApp() {
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
 
   useEffect(() => {
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. The client is offline.");
+        }
+      }
+    };
+    testConnection();
+
     const unsubAvail = onSnapshot(collection(db, "availability"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Availability));
       setAvailability(data);
@@ -185,12 +204,17 @@ function SchedulingApp() {
     if (isAdminLoggedIn) {
       setView(view === "student" ? "admin" : "student");
     } else {
-      const pass = prompt("Enter Admin Password:");
-      if (pass === "lucas123") { // Simple password for now
-        setIsAdminLoggedIn(true);
-        setView("admin");
+      const email = prompt("Enter Admin Email:");
+      if (email === "lucaspinheirofab@gmail.com") {
+        const pass = prompt("Enter Admin Password:");
+        if (pass === "AirbusA320#") {
+          setIsAdminLoggedIn(true);
+          setView("admin");
+        } else {
+          alert("Wrong password!");
+        }
       } else {
-        alert("Wrong password!");
+        alert("Access denied!");
       }
     }
   };
@@ -353,7 +377,7 @@ function SchedulingApp() {
                 
                 <div className="space-y-4 text-left">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Nome Completo</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Full Name</label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input 
@@ -366,7 +390,7 @@ function SchedulingApp() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">WhatsApp / Telefone</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">WhatsApp / Phone Number</label>
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input 

@@ -1,62 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: availability
-    // Fields:
-    //   - dayOfWeek: number (0-6)
-    //   - startTime: string (HH:mm)
-    //   - endTime: string (HH:mm)
-    //
-    // Collection: appointments
-    // Fields:
-    //   - studentName: string
-    //   - studentPhone: string
-    //   - startTime: string (ISO 8601)
-    //   - endTime: string (ISO 8601)
-    //   - status: string ('booked' | 'cancelled')
-    //
-    // ===============================================================
-
-    // Helper Functions
-    function isAdmin() {
-      // Since we removed Google Auth, we'll allow public access for now
-      // In a real app, you'd use a secret key or custom auth
-      return true; 
-    }
-
-    function isValidAvailability(data) {
-      return data.keys().hasAll(['dayOfWeek', 'startTime', 'endTime']) &&
-             data.dayOfWeek is number && data.dayOfWeek >= 0 && data.dayOfWeek <= 6 &&
-             data.startTime is string && data.startTime.size() == 5 &&
-             data.endTime is string && data.endTime.size() == 5;
-    }
-
-    function isValidAppointment(data) {
-      return data.keys().hasAll(['studentName', 'studentPhone', 'startTime', 'endTime', 'status', 'createdAt']) &&
-             data.studentName is string && data.studentName.size() > 0 && data.studentName.size() < 100 &&
-             data.studentPhone is string && data.studentPhone.size() > 0 && data.studentPhone.size() < 20 &&
-             data.startTime is string && data.endTime is string &&
-             data.status in ['booked', 'cancelled'] &&
-             (data.createdAt is timestamp || data.createdAt == null);
-    }
-
-    match /availability/{id} {
-      allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    match /appointments/{id} {
-      allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
