@@ -353,6 +353,9 @@ function SchedulingApp() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* Navigation */}
+      <div className="bg-slate-100 text-center py-1">
+        <span className="text-[10px] text-slate-400 tracking-wider uppercase">America/Sao_Paulo (Brasilia)</span>
+      </div>
       <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-2 font-bold text-xl text-blue-600">
           <BookLogo size="sm" />
