@@ -33,11 +33,13 @@ import {
   setMinutes,
   addHours
 } from "date-fns";
-import { TZDate } from "@date-fns/tz";
-
-const TIMEZONE = "America/Sao_Paulo";
-const nowBrasilia = () => new TZDate(new Date(), TIMEZONE);
-const toBrasilia = (date: Date) => new TZDate(date, TIMEZONE);
+// Convert local day/hour to UTC day/hour
+const localToUtc = (localDay: number, localHour: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + (localDay - d.getDay()));
+  d.setHours(localHour, 0, 0, 0);
+  return { day: d.getUTCDay(), hour: d.getUTCHours() };
+};
 import { 
   collection, 
   onSnapshot, 
@@ -165,10 +167,7 @@ function SchedulingApp() {
   const [adminTab, setAdminTab] = useState<"schedule" | "availability">("schedule");
   const [step, setStep] = useState<"info" | "schedule" | "success">("info");
   const [studentInfo, setStudentInfo] = useState({ name: "", phone: "" });
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const now = nowBrasilia();
-    return new TZDate(now.getFullYear(), now.getMonth(), now.getDate(), TIMEZONE);
-  });
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   useEffect(() => {
     const testConnection = async () => {
@@ -209,8 +208,8 @@ function SchedulingApp() {
         return {
           id: doc.id,
           ...d,
-          startTime: toBrasilia(new Date(d.startTime)),
-          endTime: toBrasilia(new Date(d.endTime))
+          startTime: new Date(d.startTime),
+          endTime: new Date(d.endTime)
         } as Appointment;
       });
       setAppointments(data);
@@ -247,7 +246,7 @@ function SchedulingApp() {
   };
 
   const weekDays = useMemo(() => {
-    const start = startOfWeek(nowBrasilia(), { weekStartsOn: 1 });
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
     return eachDayOfInterval({
       start,
       end: addDays(start, 6)
@@ -255,22 +254,19 @@ function SchedulingApp() {
   }, []);
 
   const generateTimeSlots = (date: Date) => {
-    const brasiliaDate = toBrasilia(date);
-    const dayOfWeek = brasiliaDate.getDay();
-    const dayAvailability = availability.filter(a => a.dayOfWeek === dayOfWeek);
-
-    if (dayAvailability.length === 0) return [];
-
     const slots: Date[] = [];
-    dayAvailability.forEach(avail => {
-      const current = setMinutes(setHours(brasiliaDate, avail.hour), 0);
+    for (let h = 0; h < 24; h++) {
+      const slotDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 0, 0, 0);
+      const utcDay = slotDate.getUTCDay();
+      const utcHour = slotDate.getUTCHours();
 
-      if (!isPast(addMinutes(current, 50))) {
-        slots.push(current);
+      if (availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour)) {
+        if (!isPast(addMinutes(slotDate, 50))) {
+          slots.push(slotDate);
+        }
       }
-    });
-
-    return slots.sort((a, b) => a.getTime() - b.getTime());
+    }
+    return slots;
   };
 
   const availableSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate, availability]);
@@ -315,22 +311,23 @@ function SchedulingApp() {
 
   const [pendingSlots, setPendingSlots] = useState<Set<string>>(new Set());
 
-  const toggleAvailability = async (day: number, hour: number) => {
-    const slotKey = `${day}-${hour}`;
+  const toggleAvailability = async (localDay: number, localHour: number) => {
+    const slotKey = `${localDay}-${localHour}`;
     if (pendingSlots.has(slotKey)) return;
 
-    const existing = availability.find(a => a.dayOfWeek === day && a.hour === hour);
+    const { day: utcDay, hour: utcHour } = localToUtc(localDay, localHour);
+    const existing = availability.find(a => a.dayOfWeek === utcDay && a.hour === utcHour);
     const path = "availability";
-    
+
     setPendingSlots(prev => new Set(prev).add(slotKey));
-    
+
     try {
       if (existing) {
         await deleteDoc(doc(db, path, existing.id));
       } else {
         await addDoc(collection(db, path), {
-          dayOfWeek: day,
-          hour: hour
+          dayOfWeek: utcDay,
+          hour: utcHour
         });
       }
       toast.success("Availability updated", { id: "availability-update" });
@@ -353,9 +350,6 @@ function SchedulingApp() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* Navigation */}
-      <div className="bg-slate-100 text-center py-1">
-        <span className="text-[10px] text-slate-400 tracking-wider uppercase">America/Sao_Paulo (Brasilia)</span>
-      </div>
       <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-2 font-bold text-xl text-blue-600">
           <BookLogo size="sm" />
@@ -454,7 +448,7 @@ function SchedulingApp() {
                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                   {weekDays.map((day, i) => {
                     const isSelected = isSameDay(day, selectedDate);
-                    const isToday = isSameDay(day, nowBrasilia());
+                    const isToday = isSameDay(day, new Date());
                     return (
                       <button
                         key={i}
@@ -602,7 +596,7 @@ function SchedulingApp() {
                 
                 <div className="grid grid-cols-7 min-w-[800px] gap-4">
                   {[0, 1, 2, 3, 4, 5, 6].map((dayOffset) => {
-                    const date = addDays(startOfWeek(nowBrasilia(), { weekStartsOn: 0 }), dayOffset);
+                    const date = addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), dayOffset);
                     const dayAppointments = appointments.filter(app => 
                       isSameDay(app.startTime, date)
                     );
@@ -658,7 +652,7 @@ function SchedulingApp() {
                       <div className="w-20" /> {/* Hour label column */}
                       {[1, 2, 3, 4, 5, 6, 0].map(day => (
                         <div key={day} className="text-center font-bold text-xs uppercase tracking-widest text-slate-400">
-                          {format(addDays(startOfWeek(nowBrasilia(), { weekStartsOn: 0 }), day), "EEE")}
+                          {format(addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), day), "EEE")}
                         </div>
                       ))}
                     </div>
@@ -667,10 +661,11 @@ function SchedulingApp() {
                       {Array.from({ length: 16 }, (_, i) => i + 7).map(hour => (
                         <div key={hour} className="grid grid-cols-8 gap-2 items-center">
                           <div className="text-right pr-4 text-[10px] font-bold text-slate-400">
-                            {format(setHours(nowBrasilia(), hour), "HH:00")}
+                            {format(setHours(new Date(), hour), "HH:00")}
                           </div>
                           {[1, 2, 3, 4, 5, 6, 0].map(day => {
-                            const isActive = availability.some(a => a.dayOfWeek === day && a.hour === hour);
+                            const { day: utcDay, hour: utcHour } = localToUtc(day, hour);
+                            const isActive = availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour);
                             return (
                               <button
                                 key={day}
