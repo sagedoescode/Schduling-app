@@ -301,7 +301,6 @@ function SchedulingApp() {
     const path = "availability";
     
     setPendingSlots(prev => new Set(prev).add(slotKey));
-    const toastId = toast.loading("Saving availability...");
     
     try {
       if (existing) {
@@ -312,9 +311,9 @@ function SchedulingApp() {
           hour: hour
         });
       }
-      toast.success("Availability updated", { id: toastId });
+      toast.success("Availability updated", { id: "availability-update" });
     } catch (error) {
-      toast.error("Failed to update availability", { id: toastId });
+      toast.error("Failed to update availability");
       handleFirestoreError(error, OperationType.WRITE, path);
     } finally {
       setPendingSlots(prev => {
@@ -651,18 +650,14 @@ function SchedulingApp() {
                             return (
                               <button
                                 key={day}
-                                disabled={isPending}
                                 onClick={() => toggleAvailability(day, hour)}
                                 className={`h-10 rounded-xl border transition-all ${
                                   isActive 
                                     ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100" 
                                     : "bg-slate-50 border-slate-100 hover:border-blue-200"
-                                } ${isPending ? "opacity-50 cursor-wait" : ""}`}
+                                } ${isPending ? "opacity-70" : ""}`}
                               >
-                                {isActive && !isPending && <Check className="w-4 h-4 mx-auto" />}
-                                {isPending && (
-                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
-                                )}
+                                {isActive && <Check className="w-4 h-4 mx-auto" />}
                               </button>
                             );
                           })}
