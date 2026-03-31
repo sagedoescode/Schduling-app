@@ -176,6 +176,10 @@ function SchedulingApp() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [view, setView] = useState<"student" | "admin">("student");
   const [adminTab, setAdminTab] = useState<"schedule" | "availability">("schedule");
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [step, setStep] = useState<"info" | "schedule" | "success">("info");
   const [studentInfo, setStudentInfo] = useState({ name: "", phone: "" });
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
@@ -236,18 +240,21 @@ function SchedulingApp() {
     if (isAdminLoggedIn) {
       setView(view === "student" ? "admin" : "student");
     } else {
-      const email = prompt("Enter Admin Email:");
-      if (email === "lucaspinheirofab@gmail.com") {
-        const pass = prompt("Enter Admin Password:");
-        if (pass === "AirbusA320#") {
-          setIsAdminLoggedIn(true);
-          setView("admin");
-        } else {
-          alert("Wrong password!");
-        }
-      } else {
-        alert("Access denied!");
-      }
+      setLoginEmail("");
+      setLoginPassword("");
+      setLoginError("");
+      setShowLoginModal(true);
+    }
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginEmail === "lucaspinheirofab@gmail.com" && loginPassword === "AirbusA320#") {
+      setIsAdminLoggedIn(true);
+      setView("admin");
+      setShowLoginModal(false);
+    } else {
+      setLoginError("Invalid email or password");
     }
   };
 
@@ -702,6 +709,70 @@ function SchedulingApp() {
           </div>
         )}
       </main>
+
+      {/* Admin Login Modal */}
+      <AnimatePresence>
+        {showLoginModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-6"
+            onClick={() => setShowLoginModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold">Admin Login</h2>
+                <button
+                  onClick={() => setShowLoginModal(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Email</label>
+                  <input
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => { setLoginEmail(e.target.value); setLoginError(""); }}
+                    placeholder="admin@example.com"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Password</label>
+                  <input
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => { setLoginPassword(e.target.value); setLoginError(""); }}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+                {loginError && (
+                  <p className="text-red-500 text-sm font-medium">{loginError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={!loginEmail || !loginPassword}
+                  className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all"
+                >
+                  Sign In
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
