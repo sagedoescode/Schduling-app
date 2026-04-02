@@ -264,10 +264,14 @@ function SchedulingApp() {
   };
 
   const weekDays = useMemo(() => {
-    const start = startOfWeek(nowLocal(), { weekStartsOn: 1 });
+    const now = nowLocal();
+    const dayOfWeek = now.getDay();
+    const start = startOfWeek(now, { weekStartsOn: 1 });
+    // Show next week too on Thu(4), Fri(5), Sat(6), Sun(0)
+    const showNextWeek = dayOfWeek === 0 || dayOfWeek >= 4;
     return eachDayOfInterval({
       start,
-      end: addDays(start, 6)
+      end: addDays(start, showNextWeek ? 13 : 6)
     });
   }, [tz]);
 
