@@ -173,8 +173,14 @@ function SchedulingApp() {
     return { day: target.getUTCDay(), hour: target.getUTCHours() };
   };
 
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => localStorage.getItem("adminSession") === "true");
-  const [view, setView] = useState<"student" | "admin">(() => localStorage.getItem("adminSession") === "true" ? "admin" : "student");
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    const ts = localStorage.getItem("adminSessionTs");
+    return ts ? Date.now() - Number(ts) < 7 * 24 * 60 * 60 * 1000 : false;
+  });
+  const [view, setView] = useState<"student" | "admin">(() => {
+    const ts = localStorage.getItem("adminSessionTs");
+    return ts && Date.now() - Number(ts) < 7 * 24 * 60 * 60 * 1000 ? "admin" : "student";
+  });
   const [adminTab, setAdminTab] = useState<"schedule" | "availability">("schedule");
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -253,7 +259,7 @@ function SchedulingApp() {
       setIsAdminLoggedIn(true);
       setView("admin");
       setShowLoginModal(false);
-      localStorage.setItem("adminSession", "true");
+      localStorage.setItem("adminSessionTs", String(Date.now()));
     } else {
       setLoginError("Invalid email or password");
     }
@@ -262,7 +268,7 @@ function SchedulingApp() {
   const handleLogout = () => {
     setIsAdminLoggedIn(false);
     setView("student");
-    localStorage.removeItem("adminSession");
+    localStorage.removeItem("adminSessionTs");
   };
 
   const weekDays = useMemo(() => {
