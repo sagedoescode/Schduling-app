@@ -613,15 +613,19 @@ function SchedulingApp() {
             </div>
 
             {adminTab === "schedule" ? (
-              <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100 overflow-x-auto">
+              <div className="space-y-6">
+                {[0, 1].map((weekIndex) => {
+                  const weekStart = addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), weekIndex * 7);
+                  return (
+                <div key={weekIndex} className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100 overflow-x-auto">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-blue-600" />
-                  Weekly Schedule
+                  {weekIndex === 0 ? "This Week" : "Next Week"}
                 </h3>
-                
+
                 <div className="grid grid-cols-7 min-w-[800px] gap-4">
                   {[0, 1, 2, 3, 4, 5, 6].map((dayOffset) => {
-                    const date = addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), dayOffset);
+                    const date = addDays(weekStart, dayOffset);
                     const dayAppointments = appointments.filter(app => 
                       isSameDay(app.startTime, date)
                     );
@@ -658,6 +662,9 @@ function SchedulingApp() {
                     );
                   })}
                 </div>
+              </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
