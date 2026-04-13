@@ -638,23 +638,28 @@ function SchedulingApp() {
                       exit={{ opacity: 0, y: 20 }}
                       className="fixed bottom-8 left-6 right-6 max-w-4xl mx-auto"
                     >
-                      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-white/10 rounded-xl">
-                            <Calendar className="w-6 h-6" />
+                      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-2xl">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white/10 rounded-xl">
+                              <Calendar className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Confirm Class</div>
+                              <div className="font-bold">{format(selectedSlot, "EEEE, MMMM do")} at {format(selectedSlot, "HH:mm")}</div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Confirm Class</div>
-                            <div className="font-bold">{format(selectedSlot, "EEEE, MMMM do")} at {format(selectedSlot, "HH:mm")}</div>
-                          </div>
+                          <button
+                            onClick={handleSchedule}
+                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Check className="w-5 h-5" />
+                            Book Now
+                          </button>
                         </div>
-                        <button 
-                          onClick={handleSchedule}
-                          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Check className="w-5 h-5" />
-                          Book Now
-                        </button>
+                        <p className="text-[11px] text-slate-400 mt-3 leading-relaxed text-center sm:text-left">
+                          Ao agendar, você concorda em enviar uma confirmação pelo WhatsApp até 1 hora antes da aula. Sem confirmação, a aula será reagendada. Em caso de não comparecimento nos primeiros 10 minutos, a aula será cancelada e precisará ser remarcada.
+                        </p>
                       </div>
                     </motion.div>
                   )}
