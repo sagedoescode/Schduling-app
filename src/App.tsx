@@ -379,7 +379,7 @@ function SchedulingApp() {
       const utcHour = slotDate.getUTCHours();
 
       if (availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour)) {
-        if (!isPast(addMinutes(slotDate, adminSettings.meetingDurationMinutes || 30))) {
+        if (!isBefore(slotDate, addHours(new Date(), 12))) {
           slots.push(slotDate);
         }
       }
