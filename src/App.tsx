@@ -498,7 +498,7 @@ function SchedulingApp() {
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto p-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {view === "student" ? (
           <div className="space-y-8">
             {step === "info" && (
@@ -688,7 +688,7 @@ function SchedulingApp() {
             )}
           </div>
         ) : (
-          <div className="max-w-7xl mx-auto space-y-8">
+          <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
@@ -721,45 +721,46 @@ function SchedulingApp() {
                 {[0, 1].map((weekIndex) => {
                   const weekStart = addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), weekIndex * 7);
                   return (
-                <div key={weekIndex} className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100 overflow-x-auto">
+                <div key={weekIndex} className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-blue-600" />
                   {weekIndex === 0 ? "This Week" : "Next Week"}
                 </h3>
 
-                <div className="grid grid-cols-7 min-w-[800px] gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4">
                   {[0, 1, 2, 3, 4, 5, 6].map((dayOffset) => {
                     const date = addDays(weekStart, dayOffset);
-                    const dayAppointments = appointments.filter(app => 
+                    const dayAppointments = appointments.filter(app =>
                       isSameDay(app.startTime, date)
                     );
+                    const isToday = isSameDay(date, new Date());
 
                     return (
-                      <div key={dayOffset} className="flex flex-col gap-3">
-                        <div className="text-center p-2 bg-slate-50 rounded-xl">
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{format(date, "EEE")}</div>
+                      <div key={dayOffset} className={`flex flex-col gap-2 rounded-2xl p-3 ${isToday ? "bg-blue-50 ring-2 ring-blue-200" : ""}`}>
+                        <div className={`text-center p-2 rounded-xl ${isToday ? "bg-blue-600 text-white" : "bg-slate-50"}`}>
+                          <div className={`text-[10px] font-bold uppercase tracking-widest ${isToday ? "text-blue-100" : "text-slate-400"}`}>{format(date, "EEE")}</div>
                           <div className="text-lg font-bold">{format(date, "dd")}</div>
                         </div>
-                        
+
                         <div className="flex flex-col gap-2">
                           {dayAppointments.length > 0 ? (
                             dayAppointments
                               .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
                               .map((app) => (
-                                <div key={app.id} className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-[10px] group relative">
+                                <div key={app.id} className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs group relative">
                                   <div className="font-bold text-blue-700">{format(app.startTime, "HH:mm")}</div>
                                   <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
-                                  <div className="text-slate-500">{app.studentPhone}</div>
-                                  <button 
+                                  <div className="text-slate-500 text-[10px]">{app.studentPhone}</div>
+                                  <button
                                     onClick={() => removeAppointment(app.id)}
-                                    className="mt-2 text-red-500 hover:text-red-700 font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     Cancel
                                   </button>
                                 </div>
                               ))
                           ) : (
-                            <div className="text-center py-4 text-slate-300 text-[10px] italic">No classes</div>
+                            <div className="text-center py-3 text-slate-300 text-[10px] italic">No classes</div>
                           )}
                         </div>
                       </div>
@@ -771,55 +772,50 @@ function SchedulingApp() {
                 })}
               </div>
             ) : adminTab === "availability" ? (
-              <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
+              <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                     <Clock className="w-5 h-5 text-blue-600" />
                     Availability Grid
                   </h3>
-                  <div className="text-xs text-slate-400 font-medium italic">
-                    Changes are saved automatically.
+                  <div className="text-[10px] sm:text-xs text-slate-400 font-medium italic">
+                    Tap to toggle
                   </div>
                 </div>
-                
-                <div className="overflow-x-auto no-scrollbar">
-                  <div className="min-w-[800px]">
-                    <div className="grid grid-cols-8 gap-2 mb-4">
-                      <div className="w-20" /> {/* Hour label column */}
-                      {[1, 2, 3, 4, 5, 6, 0].map(day => (
-                        <div key={day} className="text-center font-bold text-xs uppercase tracking-widest text-slate-400">
-                          {format(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEE")}
-                        </div>
-                      ))}
+
+                <div className="grid grid-cols-8 gap-1 sm:gap-2">
+                  <div /> {/* Hour label column */}
+                  {[1, 2, 3, 4, 5, 6, 0].map(day => (
+                    <div key={day} className="text-center font-bold text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 pb-2">
+                      {format(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEEEE")}
+                      <span className="hidden sm:inline">{format(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEE").slice(1)}</span>
                     </div>
-                    
-                    <div className="space-y-2">
-                      {Array.from({ length: 16 }, (_, i) => i + 7).map(hour => (
-                        <div key={hour} className="grid grid-cols-8 gap-2 items-center">
-                          <div className="text-right pr-4 text-[10px] font-bold text-slate-400">
-                            {format(setHours(nowLocal(), hour), "HH:00")}
-                          </div>
-                          {[1, 2, 3, 4, 5, 6, 0].map(day => {
-                            const { day: utcDay, hour: utcHour } = localToUtc(day, hour);
-                            const isActive = availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour);
-                            return (
-                              <button
-                                key={day}
-                                onClick={() => toggleAvailability(day, hour)}
-                                className={`h-10 rounded-xl border transition-all ${
-                                  isActive 
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100" 
-                                    : "bg-slate-50 border-slate-100 hover:border-blue-200"
-                                }`}
-                              >
-                                {isActive && <Check className="w-4 h-4 mx-auto" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
+
+                  {Array.from({ length: 16 }, (_, i) => i + 7).map(hour => (
+                    <>{/* Fragment for each row */}
+                      <div key={`label-${hour}`} className="text-right pr-1 sm:pr-3 text-[10px] font-bold text-slate-400 flex items-center justify-end h-8 sm:h-10">
+                        {format(setHours(nowLocal(), hour), "HH:00")}
+                      </div>
+                      {[1, 2, 3, 4, 5, 6, 0].map(day => {
+                        const { day: utcDay, hour: utcHour } = localToUtc(day, hour);
+                        const isActive = availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour);
+                        return (
+                          <button
+                            key={`${day}-${hour}`}
+                            onClick={() => toggleAvailability(day, hour)}
+                            className={`h-8 sm:h-10 rounded-lg sm:rounded-xl border transition-all ${
+                              isActive
+                                ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
+                                : "bg-slate-50 border-slate-100 hover:border-blue-200 active:bg-blue-50"
+                            }`}
+                          >
+                            {isActive && <Check className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />}
+                          </button>
+                        );
+                      })}
+                    </>
+                  ))}
                 </div>
               </div>
             ) : (
