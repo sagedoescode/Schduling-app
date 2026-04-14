@@ -796,7 +796,7 @@ function SchedulingApp() {
                               .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
                               .map((app) => {
                                 const style = tagStyles[app.tag || "default"];
-                                const tagLabel = app.tag ? app.tag.replace("-", " ") : null;
+                                const tagLabel = app.tag ? app.tag.replace("-", " ") : "normal";
                                 return (
                                 <div
                                   key={app.id}
@@ -809,9 +809,7 @@ function SchedulingApp() {
                                   <div className="font-bold">{format(app.startTime, "HH:mm")}</div>
                                   <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
                                   <div className="text-slate-500 text-[10px]">{app.studentPhone}</div>
-                                  {tagLabel && (
-                                    <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
-                                  )}
+                                  <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
                                   <button
                                     onClick={() => removeAppointment(app.id)}
                                     className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
@@ -969,11 +967,9 @@ function SchedulingApp() {
                               <div className="text-xs text-slate-500">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
                             </div>
                           </div>
-                          {app.tag && (
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                              {app.tag.replace("-", " ")}
-                            </div>
-                          )}
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            {app.tag ? app.tag.replace("-", " ") : "normal"}
+                          </div>
                         </div>
                         );
                       })}
