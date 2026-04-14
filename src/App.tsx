@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Component, ReactNode } from "react";
+import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
 import { 
@@ -297,82 +297,80 @@ function SchedulingApp() {
     }
   };
 
-  const tokenClientRef = useRef<any>(null);
-  const pendingResolverRef = useRef<((token: string | null) => void) | null>(null);
-
-  // Initialize Google Identity Services token client once script loads
-  useEffect(() => {
+  // Build OAuth URL for full-page redirect
+  const buildOAuthUrl = (promptType: "consent" | "none") => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    console.log("[GCal] Init, clientId present:", !!clientId);
-    if (!clientId) return;
-    const init = () => {
-      const g: any = (window as any).google;
-      if (!g?.accounts?.oauth2) {
-        console.log("[GCal] Waiting for GIS script...");
-        setTimeout(init, 300);
-        return;
-      }
-      console.log("[GCal] Creating token client");
-      tokenClientRef.current = g.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: "https://www.googleapis.com/auth/calendar.events",
-        callback: (resp: any) => {
-          console.log("[GCal] Token callback fired:", resp);
-          const resolve = pendingResolverRef.current;
-          pendingResolverRef.current = null;
-          if (resp.error || !resp.access_token) {
-            console.error("[GCal] Token error:", resp.error, resp.error_description);
-            resolve?.(null);
-            return;
-          }
-          const expiry = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
-          console.log("[GCal] Token obtained, saving settings");
-          saveAdminSettings({
-            googleCalendarConnected: true,
-            googleAccessToken: resp.access_token,
-            googleTokenExpiry: expiry,
-          }, { silent: true });
-          resolve?.(resp.access_token);
-        },
-        error_callback: (err: any) => {
-          console.error("[GCal] error_callback:", err);
-          const resolve = pendingResolverRef.current;
-          pendingResolverRef.current = null;
-          resolve?.(null);
-        },
-      });
-      console.log("[GCal] Token client ready");
-    };
-    init();
-  }, []);
-
-  const requestToken = (interactive: boolean): Promise<string | null> => {
-    return new Promise(resolve => {
-      if (!tokenClientRef.current) {
-        console.error("[GCal] Token client not initialized yet");
-        resolve(null);
-        return;
-      }
-      pendingResolverRef.current = resolve;
-      console.log("[GCal] Requesting token, interactive:", interactive);
-      tokenClientRef.current.requestAccessToken({ prompt: interactive ? "consent" : "" });
-    });
+    const redirectUri = window.location.origin + "/";
+    const scope = "https://www.googleapis.com/auth/calendar.events";
+    return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=${promptType}&include_granted_scopes=true`;
   };
 
-  const connectGoogleCalendar = async () => {
+  // Handle OAuth redirect callback: parse #access_token=... from URL
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes("access_token")) return;
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get("access_token");
+    const expiresIn = params.get("expires_in");
+    if (accessToken) {
+      const expiry = Date.now() + (Number(expiresIn) || 3600) * 1000;
+      saveAdminSettings({
+        googleCalendarConnected: true,
+        googleAccessToken: accessToken,
+        googleTokenExpiry: expiry,
+      }, { silent: true });
+      toast.success("Google Calendar connected!");
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  const connectGoogleCalendar = () => {
     if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-      toast.error("Google Client ID not configured. Add VITE_GOOGLE_CLIENT_ID to .env");
+      toast.error("Google Client ID not configured.");
       return;
     }
-    if (!tokenClientRef.current) {
-      toast.error("Google sign-in still loading. Try again in a few seconds.");
-      return;
-    }
-    console.log("[GCal] Connect button clicked");
-    const token = await requestToken(true);
-    console.log("[GCal] requestToken resolved with:", token ? "TOKEN" : "null");
-    if (token) toast.success("Google Calendar connected!");
-    else toast.error("Failed to connect Google Calendar - check console for details");
+    window.location.href = buildOAuthUrl("consent");
+  };
+
+  // Silent refresh via hidden iframe
+  const silentRefreshToken = (): Promise<string | null> => {
+    return new Promise(resolve => {
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = buildOAuthUrl("none");
+      const timeout = setTimeout(() => {
+        document.body.removeChild(iframe);
+        resolve(null);
+      }, 10000);
+      iframe.onload = () => {
+        try {
+          const hash = iframe.contentWindow?.location.hash;
+          if (hash?.includes("access_token")) {
+            const params = new URLSearchParams(hash.substring(1));
+            const token = params.get("access_token");
+            const expiresIn = params.get("expires_in");
+            if (token) {
+              const expiry = Date.now() + (Number(expiresIn) || 3600) * 1000;
+              saveAdminSettings({
+                googleCalendarConnected: true,
+                googleAccessToken: token,
+                googleTokenExpiry: expiry,
+              }, { silent: true });
+              clearTimeout(timeout);
+              document.body.removeChild(iframe);
+              resolve(token);
+              return;
+            }
+          }
+        } catch (e) {
+          // Cross-origin access denied (expected when iframe navigates to google.com)
+        }
+        clearTimeout(timeout);
+        document.body.removeChild(iframe);
+        resolve(null);
+      };
+      document.body.appendChild(iframe);
+    });
   };
 
   const getValidAccessToken = async (): Promise<string | null> => {
@@ -380,8 +378,7 @@ function SchedulingApp() {
     if (googleAccessToken && googleTokenExpiry && Date.now() < googleTokenExpiry - 60000) {
       return googleAccessToken;
     }
-    // Silent refresh
-    return requestToken(false);
+    return silentRefreshToken();
   };
 
   const addToGoogleCalendar = async (studentName: string, start: Date, end: Date): Promise<string | null> => {
@@ -434,15 +431,16 @@ function SchedulingApp() {
 
   const disconnectGoogleCalendar = async () => {
     const token = adminSettings.googleAccessToken;
-    const g: any = (window as any).google;
-    if (token && g?.accounts?.oauth2) {
-      g.accounts.oauth2.revoke(token, () => {});
+    if (token) {
+      // Fire-and-forget revoke so Google forgets the grant
+      fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: "POST" }).catch(() => {});
     }
     await saveAdminSettings({
       googleCalendarConnected: false,
       googleAccessToken: undefined,
       googleTokenExpiry: undefined,
     });
+    toast.success("Google Calendar disconnected");
   };
 
   const handleAdminAccess = () => {
