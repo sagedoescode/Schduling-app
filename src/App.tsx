@@ -736,7 +736,7 @@ function SchedulingApp() {
                   <button 
                     disabled={!studentInfo.name || !studentInfo.phone}
                     onClick={() => setStep("schedule")}
-                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all mt-4"
+                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all mt-4"
                   >
                     Continue to Schedule
                   </button>
@@ -774,7 +774,7 @@ function SchedulingApp() {
                         onClick={() => setSelectedDate(day)}
                         className={`flex-shrink-0 w-20 py-4 rounded-2xl border transition-all ${
                           isSelected 
-                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200" 
+                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" 
                             : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500"
                         }`}
                       >
@@ -899,25 +899,25 @@ function SchedulingApp() {
               <div className="flex gap-1 sm:gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
                 <button
                   onClick={() => setAdminTab("schedule")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "schedule" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "schedule" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-slate-600 dark:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-700/60"}`}
                 >
                   Schedule
                 </button>
                 <button
                   onClick={() => setAdminTab("availability")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "availability" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "availability" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-slate-600 dark:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-700/60"}`}
                 >
                   Availability
                 </button>
                 <button
                   onClick={() => setAdminTab("history")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "history" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "history" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-slate-600 dark:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-700/60"}`}
                 >
                   History
                 </button>
                 <button
                   onClick={() => setAdminTab("settings")}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-slate-600 dark:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-700/60"}`}
                 >
                   Settings
                 </button>
@@ -1035,7 +1035,7 @@ function SchedulingApp() {
                           onClick={() => toggleAvailability(day, hour)}
                           className={`h-8 sm:h-10 rounded-lg sm:rounded-xl border transition-all ${
                             isActive
-                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
+                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100 dark:shadow-none"
                               : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-600 active:bg-blue-50 dark:active:bg-blue-950"
                           }`}
                         >
@@ -1080,7 +1080,7 @@ function SchedulingApp() {
                         onClick={() => setHistoryMonth(m)}
                         className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all relative ${
                           isActive
-                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
+                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100 dark:shadow-none"
                             : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-200 dark:hover:border-blue-600"
                         }`}
                       >
@@ -1166,7 +1166,7 @@ function SchedulingApp() {
                             onClick={() => saveAdminSettings({ meetingDurationMinutes: mins })}
                             className={`px-5 py-3 rounded-xl border font-bold text-sm transition-all ${
                               adminSettings.meetingDurationMinutes === mins
-                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200"
+                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none"
                                 : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500"
                             }`}
                           >
@@ -1198,7 +1198,7 @@ function SchedulingApp() {
                       ) : (
                         <button
                           onClick={connectGoogleCalendar}
-                          className="flex items-center gap-3 px-6 py-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm hover:border-blue-300 hover:shadow-lg transition-all"
+                          className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-lg transition-all"
                         >
                           <svg className="w-5 h-5" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -1319,7 +1319,7 @@ function SchedulingApp() {
                 <button
                   type="submit"
                   disabled={!loginEmail || !loginPassword}
-                  className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all"
+                  className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all"
                 >
                   Sign In
                 </button>
