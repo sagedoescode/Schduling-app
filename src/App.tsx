@@ -304,7 +304,7 @@ function SchedulingApp() {
     }
     const redirectUri = window.location.origin;
     const scope = "https://www.googleapis.com/auth/calendar.events";
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=consent&access_type=offline`;
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=consent&include_granted_scopes=true`;
     window.location.href = url;
   };
 
