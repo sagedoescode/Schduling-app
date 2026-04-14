@@ -800,9 +800,9 @@ function SchedulingApp() {
                           )}
                         </div>
 
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 w-full">
                           {dayAppointments.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                               {dayAppointments.map((app) => {
                                 const style = tagStyles[app.tag || "default"];
                                 const tagLabel = app.tag ? app.tag.replace("-", " ") : "normal";
@@ -813,7 +813,7 @@ function SchedulingApp() {
                                       e.preventDefault();
                                       setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
                                     }}
-                                    className={`p-3 border rounded-xl text-xs group relative cursor-context-menu w-[160px] ${style}`}
+                                    className={`p-3 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
                                   >
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
                                     <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
@@ -862,30 +862,28 @@ function SchedulingApp() {
                     </div>
                   ))}
 
-                  {Array.from({ length: 16 }, (_, i) => i + 7).map(hour => (
-                    <>{/* Fragment for each row */}
-                      <div key={`label-${hour}`} className="text-right pr-1 sm:pr-3 text-[10px] font-bold text-slate-400 flex items-center justify-end h-8 sm:h-10">
-                        {format(setHours(nowLocal(), hour), "HH:00")}
-                      </div>
-                      {[1, 2, 3, 4, 5, 6, 0].map(day => {
-                        const { day: utcDay, hour: utcHour } = localToUtc(day, hour);
-                        const isActive = availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour);
-                        return (
-                          <button
-                            key={`${day}-${hour}`}
-                            onClick={() => toggleAvailability(day, hour)}
-                            className={`h-8 sm:h-10 rounded-lg sm:rounded-xl border transition-all ${
-                              isActive
-                                ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
-                                : "bg-slate-50 border-slate-100 hover:border-blue-200 active:bg-blue-50"
-                            }`}
-                          >
-                            {isActive && <Check className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />}
-                          </button>
-                        );
-                      })}
-                    </>
-                  ))}
+                  {Array.from({ length: 16 }, (_, i) => i + 7).flatMap(hour => [
+                    <div key={`label-${hour}`} className="text-right pr-1 sm:pr-3 text-[10px] font-bold text-slate-400 flex items-center justify-end h-8 sm:h-10">
+                      {format(setHours(nowLocal(), hour), "HH:00")}
+                    </div>,
+                    ...[1, 2, 3, 4, 5, 6, 0].map(day => {
+                      const { day: utcDay, hour: utcHour } = localToUtc(day, hour);
+                      const isActive = availability.some(a => a.dayOfWeek === utcDay && a.hour === utcHour);
+                      return (
+                        <button
+                          key={`${day}-${hour}`}
+                          onClick={() => toggleAvailability(day, hour)}
+                          className={`h-8 sm:h-10 rounded-lg sm:rounded-xl border transition-all ${
+                            isActive
+                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
+                              : "bg-slate-50 border-slate-100 hover:border-blue-200 active:bg-blue-50"
+                          }`}
+                        >
+                          {isActive && <Check className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />}
+                        </button>
+                      );
+                    })
+                  ])}
                 </div>
               </div>
             ) : adminTab === "history" ? (
