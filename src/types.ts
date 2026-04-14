@@ -23,11 +23,13 @@ export interface Appointment {
   endTime: Date;
   status: 'booked' | 'cancelled';
   tag?: AppointmentTag;
+  googleCalendarEventId?: string;
 }
 
 export interface AdminSettings {
   meetingDurationMinutes: number;
   googleCalendarConnected: boolean;
+  googleCalendarAutoSync?: boolean;
   googleAccessToken?: string;
   googleRefreshToken?: string;
   googleTokenExpiry?: number;

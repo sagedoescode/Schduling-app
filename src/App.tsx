@@ -362,12 +362,12 @@ function SchedulingApp() {
     return requestToken(false);
   };
 
-  const addToGoogleCalendar = async (studentName: string, start: Date, end: Date) => {
-    if (!adminSettings.googleCalendarConnected) return;
+  const addToGoogleCalendar = async (studentName: string, start: Date, end: Date): Promise<string | null> => {
+    if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return null;
     const token = await getValidAccessToken();
     if (!token) {
       toast.error("Google Calendar session expired. Please reconnect in Settings.");
-      return;
+      return null;
     }
     try {
       const event = {
@@ -384,11 +384,29 @@ function SchedulingApp() {
         },
         body: JSON.stringify(event),
       });
-      if (!res.ok) {
-        console.error("Failed to create calendar event:", await res.text());
+      if (res.ok) {
+        const data = await res.json();
+        return data.id || null;
       }
+      console.error("Failed to create calendar event:", await res.text());
+      return null;
     } catch (e) {
       console.error("Google Calendar error:", e);
+      return null;
+    }
+  };
+
+  const removeFromGoogleCalendar = async (eventId: string) => {
+    if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return;
+    const token = await getValidAccessToken();
+    if (!token) return;
+    try {
+      await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+    } catch (e) {
+      console.error("Failed to remove calendar event:", e);
     }
   };
 
@@ -474,7 +492,7 @@ function SchedulingApp() {
     const duration = adminSettings.meetingDurationMinutes || 30;
     const endTime = addMinutes(selectedSlot, duration);
     try {
-      await addDoc(collection(db, path), {
+      const docRef = await addDoc(collection(db, path), {
         studentName: studentInfo.name,
         studentPhone: studentInfo.phone,
         startTime: selectedSlot.toISOString(),
@@ -483,8 +501,11 @@ function SchedulingApp() {
         createdAt: serverTimestamp()
       });
 
-      // Add to Google Calendar if connected
-      await addToGoogleCalendar(studentInfo.name, selectedSlot, endTime);
+      // Add to Google Calendar if connected + auto-sync enabled
+      const eventId = await addToGoogleCalendar(studentInfo.name, selectedSlot, endTime);
+      if (eventId) {
+        await updateDoc(doc(db, path, docRef.id), { googleCalendarEventId: eventId });
+      }
 
       // WhatsApp Notification
       const tzAbbr = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(selectedSlot).find(p => p.type === "timeZoneName")?.value || tz;
@@ -504,8 +525,12 @@ function SchedulingApp() {
 
   const removeAppointment = async (id: string) => {
     const path = `appointments/${id}`;
+    const appointment = appointments.find(a => a.id === id);
     try {
       await deleteDoc(doc(db, "appointments", id));
+      if (appointment?.googleCalendarEventId) {
+        await removeFromGoogleCalendar(appointment.googleCalendarEventId);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
@@ -1095,11 +1120,27 @@ function SchedulingApp() {
                           Connect Google Calendar
                         </button>
                       )}
-                      <p className="text-xs text-slate-400 mt-2">
-                        {adminSettings.googleCalendarConnected
-                          ? "New bookings will automatically appear in your Google Calendar."
-                          : "Connect to automatically add new bookings to your Google Calendar."}
-                      </p>
+                      {adminSettings.googleCalendarConnected && (
+                        <div className="mt-4 flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl">
+                          <div>
+                            <div className="text-sm font-bold text-slate-700">Auto-sync bookings</div>
+                            <div className="text-xs text-slate-500 mt-0.5">Automatically add new classes to your Google Calendar and remove cancelled ones.</div>
+                          </div>
+                          <button
+                            onClick={() => saveAdminSettings({ googleCalendarAutoSync: !(adminSettings.googleCalendarAutoSync !== false) })}
+                            className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors ${
+                              adminSettings.googleCalendarAutoSync !== false ? "bg-blue-600" : "bg-slate-300"
+                            }`}
+                          >
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                              adminSettings.googleCalendarAutoSync !== false ? "translate-x-6" : "translate-x-1"
+                            }`} />
+                          </button>
+                        </div>
+                      )}
+                      {!adminSettings.googleCalendarConnected && (
+                        <p className="text-xs text-slate-400 mt-2">Connect to automatically add new bookings to your Google Calendar.</p>
+                      )}
                     </div>
                   </div>
                 </div>
