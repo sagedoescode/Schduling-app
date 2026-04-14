@@ -13,6 +13,8 @@ export interface Availability {
   hour: number; // 0-23
 }
 
+export type AppointmentTag = 'trial' | 'no-show' | 'complete';
+
 export interface Appointment {
   id: string;
   studentName: string;
@@ -20,4 +22,13 @@ export interface Appointment {
   startTime: Date;
   endTime: Date;
   status: 'booked' | 'cancelled';
+  tag?: AppointmentTag;
+}
+
+export interface AdminSettings {
+  meetingDurationMinutes: number;
+  googleCalendarConnected: boolean;
+  googleAccessToken?: string;
+  googleRefreshToken?: string;
+  googleTokenExpiry?: number;
 }

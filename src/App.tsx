@@ -56,7 +56,7 @@ import {
   User as FirebaseUser
 } from "firebase/auth";
 import { db, auth, OperationType, handleFirestoreError } from "./firebase";
-import { TimeSlot, Availability, Appointment, AdminSettings } from "./types";
+import { TimeSlot, Availability, Appointment, AdminSettings, AppointmentTag } from "./types";
 
 // Error Boundary Component
 class ErrorBoundary extends Component<any, any> {
@@ -184,6 +184,36 @@ function SchedulingApp() {
   const [adminTab, setAdminTab] = useState<"schedule" | "availability" | "history" | "settings">("schedule");
   const [historyMonth, setHistoryMonth] = useState<number>(new Date().getMonth());
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
+
+  const tagStyles: Record<string, string> = {
+    trial: "bg-amber-50 border-amber-200 text-amber-800",
+    "no-show": "bg-red-50 border-red-200 text-red-700",
+    complete: "bg-green-50 border-green-200 text-green-700",
+    default: "bg-blue-50 border-blue-100 text-blue-700",
+  };
+
+  const setAppointmentTag = async (id: string, tag: AppointmentTag | null) => {
+    try {
+      await updateDoc(doc(db, "appointments", id), { tag: tag ?? null });
+      toast.success(tag ? `Marked as ${tag}` : "Tag cleared");
+    } catch (error) {
+      toast.error("Failed to update");
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
+    setContextMenu(null);
+  };
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     meetingDurationMinutes: 30,
     googleCalendarConnected: false,
@@ -764,11 +794,24 @@ function SchedulingApp() {
                           {dayAppointments.length > 0 ? (
                             dayAppointments
                               .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-                              .map((app) => (
-                                <div key={app.id} className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs group relative">
-                                  <div className="font-bold text-blue-700">{format(app.startTime, "HH:mm")}</div>
+                              .map((app) => {
+                                const style = tagStyles[app.tag || "default"];
+                                const tagLabel = app.tag ? app.tag.replace("-", " ") : null;
+                                return (
+                                <div
+                                  key={app.id}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
+                                  }}
+                                  className={`p-3 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
+                                >
+                                  <div className="font-bold">{format(app.startTime, "HH:mm")}</div>
                                   <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
                                   <div className="text-slate-500 text-[10px]">{app.studentPhone}</div>
+                                  {tagLabel && (
+                                    <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
+                                  )}
                                   <button
                                     onClick={() => removeAppointment(app.id)}
                                     className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
@@ -776,7 +819,8 @@ function SchedulingApp() {
                                     Cancel
                                   </button>
                                 </div>
-                              ))
+                                );
+                              })
                           ) : (
                             <div className="text-center py-3 text-slate-300 text-[10px] italic">No classes</div>
                           )}
@@ -886,7 +930,7 @@ function SchedulingApp() {
                 {(() => {
                   const monthAppointments = appointments
                     .filter(a => a.startTime.getFullYear() === historyYear && a.startTime.getMonth() === historyMonth)
-                    .sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
+                    .sort((a, b) => a.studentName.localeCompare(b.studentName) || b.startTime.getTime() - a.startTime.getTime());
 
                   if (monthAppointments.length === 0) {
                     return (
@@ -899,8 +943,22 @@ function SchedulingApp() {
 
                   return (
                     <div className="space-y-2">
-                      {monthAppointments.map(app => (
-                        <div key={app.id} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {monthAppointments.map(app => {
+                        const tagColors: Record<string, string> = {
+                          trial: "bg-amber-50 border-amber-200",
+                          "no-show": "bg-red-50 border-red-200",
+                          complete: "bg-green-50 border-green-200",
+                        };
+                        const bgClass = app.tag ? tagColors[app.tag] : "bg-slate-50 border-slate-100";
+                        return (
+                        <div
+                          key={app.id}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
+                          }}
+                          className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-context-menu ${bgClass}`}
+                        >
                           <div className="flex items-center gap-4">
                             <div className="text-center min-w-[60px]">
                               <div className="text-[10px] font-bold text-slate-400 uppercase">{format(app.startTime, "EEE")}</div>
@@ -911,8 +969,14 @@ function SchedulingApp() {
                               <div className="text-xs text-slate-500">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
                             </div>
                           </div>
+                          {app.tag && (
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              {app.tag.replace("-", " ")}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -994,6 +1058,28 @@ function SchedulingApp() {
           </div>
         )}
       </main>
+
+      {/* Appointment Context Menu */}
+      {contextMenu && (
+        <div
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+          className="fixed z-[100] bg-white border border-slate-200 rounded-xl shadow-2xl py-1 min-w-[180px]"
+        >
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "trial")} className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400" /> Trial (30 min)
+          </button>
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, null)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500" /> Normal (50 min)
+          </button>
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "complete")} className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500" /> Complete
+          </button>
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "no-show")} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-500" /> No-show
+          </button>
+        </div>
+      )}
 
       {/* Admin Login Modal */}
       <AnimatePresence>
