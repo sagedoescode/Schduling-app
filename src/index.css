@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
@@ -10,6 +12,13 @@
   --ink: #0f172a;
   --accent: #2563eb;
   --line: rgba(15, 23, 42, 0.1);
+}
+
+.dark {
+  --bg: #0f172a;
+  --ink: #f1f5f9;
+  --accent: #3b82f6;
+  --line: rgba(241, 245, 249, 0.1);
 }
 
 body {
@@ -32,6 +41,12 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.2);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 @layer base {

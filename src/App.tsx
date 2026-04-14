@@ -17,7 +17,9 @@ import {
   Check,
   X,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  Moon,
+  Sun
 } from "lucide-react";
 import {
   format,
@@ -156,6 +158,15 @@ const BookLogo = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
 };
 
 function SchedulingApp() {
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (darkMode) root.classList.add("dark");
+    else root.classList.remove("dark");
+    localStorage.setItem("darkMode", String(darkMode));
+  }, [darkMode]);
+
   const [tz, setTz] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   useEffect(() => {
@@ -187,9 +198,9 @@ function SchedulingApp() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
 
   const tagStyles: Record<string, string> = {
-    trial: "bg-amber-50 border-amber-200 text-amber-800",
-    "no-show": "bg-red-50 border-red-200 text-red-700",
-    complete: "bg-green-50 border-green-200 text-green-700",
+    trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
+    "no-show": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300",
+    complete: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300",
     default: "bg-blue-50 border-blue-100 text-blue-700",
   };
 
@@ -475,13 +486,11 @@ function SchedulingApp() {
   const weekDays = useMemo(() => {
     const now = nowLocal();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dayOfWeek = now.getDay();
     const start = startOfWeek(now, { weekStartsOn: 1 });
-    // Show next week too on Thu(4), Fri(5), Sat(6), Sun(0)
-    const showNextWeek = dayOfWeek === 0 || dayOfWeek >= 4;
+    // Always show 2 weeks so students can pick from next week too
     const allDays = eachDayOfInterval({
       start,
-      end: addDays(start, showNextWeek ? 13 : 6)
+      end: addDays(start, 13)
     });
     return allDays.filter(day => day >= today);
   }, [tz]);
@@ -595,25 +604,32 @@ function SchedulingApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors">
       {/* Navigation */}
-      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+      <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-2 font-bold text-xl text-blue-600">
           <BookLogo size="sm" />
           <span className="hidden sm:inline">English with Lucas</span>
         </div>
         <div className="flex items-center gap-4">
-          <button 
+          <button
+            onClick={() => setDarkMode(d => !d)}
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <button
             onClick={handleAdminAccess}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors"
+            className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
             {view === "student" ? <Settings className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             {view === "student" ? "Admin" : "Student View"}
           </button>
           {isAdminLoggedIn && (
-            <button 
+            <button
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+              className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors"
               title="Logout"
             >
               <LogOut className="w-5 h-5" />
@@ -629,17 +645,17 @@ function SchedulingApp() {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 md:p-12 max-w-md mx-auto text-center"
+                className="bg-white dark:bg-slate-800 dark:border dark:border-slate-700 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/30 p-8 md:p-12 max-w-md mx-auto text-center"
               >
                 <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
                   <BookLogo size="lg" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2">Welcome!</h1>
-                <p className="text-slate-500 mb-8">Please enter your details to view available times for your English class.</p>
+                <p className="text-slate-500 dark:text-slate-400 mb-8">Please enter your details to view available times for your English class.</p>
                 
                 <div className="space-y-4 text-left">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Full Name</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Full Name</label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input 
@@ -647,12 +663,12 @@ function SchedulingApp() {
                         value={studentInfo.name}
                         onChange={(e) => setStudentInfo({ ...studentInfo, name: e.target.value })}
                         placeholder="Your Name"
-                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">WhatsApp / Phone Number</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">WhatsApp / Phone Number</label>
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input 
@@ -660,7 +676,7 @@ function SchedulingApp() {
                         value={studentInfo.phone}
                         onChange={(e) => setStudentInfo({ ...studentInfo, phone: e.target.value })}
                         placeholder="Your WhatsApp number"
-                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -684,7 +700,7 @@ function SchedulingApp() {
                 <div className="flex items-center justify-between">
                   <button 
                     onClick={() => setStep("info")}
-                    className="p-2 hover:bg-white rounded-full transition-colors"
+                    className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-colors"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
@@ -706,7 +722,7 @@ function SchedulingApp() {
                         className={`flex-shrink-0 w-20 py-4 rounded-2xl border transition-all ${
                           isSelected 
                             ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200" 
-                            : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
+                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500"
                         }`}
                       >
                         <div className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-70">
@@ -721,7 +737,7 @@ function SchedulingApp() {
                   })}
                 </div>
 
-                <div className="bg-white rounded-3xl border border-slate-200 p-6">
+                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6">
                   <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6 flex items-center gap-2">
                     <Clock className="w-4 h-4" /> Available Slots
                   </h2>
@@ -738,10 +754,10 @@ function SchedulingApp() {
                             onClick={() => setSelectedSlot(slot)}
                             className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all ${
                               booked 
-                                ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed line-through" 
+                                ? "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-300 dark:text-slate-600 cursor-not-allowed line-through" 
                                 : selected
                                   ? "bg-blue-50 border-blue-600 text-blue-600 ring-2 ring-blue-100"
-                                  : "bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600"
+                                  : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400"
                             }`}
                           >
                             {format(slot, "HH:mm")}
@@ -750,7 +766,7 @@ function SchedulingApp() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="text-center py-12 text-slate-400 dark:text-slate-500">
                       <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
                       <p>No availability for this day.</p>
                     </div>
@@ -798,13 +814,13 @@ function SchedulingApp() {
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-3xl shadow-xl p-12 max-w-md mx-auto text-center"
+                className="bg-white dark:bg-slate-800 dark:border dark:border-slate-700 rounded-3xl shadow-xl dark:shadow-black/30 p-12 max-w-md mx-auto text-center"
               >
                 <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8">
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
                 <h1 className="text-3xl font-bold mb-4">Booked!</h1>
-                <p className="text-slate-500 mb-8 leading-relaxed">
+                <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
                   Your English class is scheduled for <span className="font-bold text-slate-900">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900">{format(selectedSlot!, "HH:mm")}</span>.
                 </p>
                 <p className="text-xs text-slate-400 mb-4">Your timezone: {tz}</p>
@@ -825,9 +841,9 @@ function SchedulingApp() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                <p className="text-slate-500">Manage your availability and view upcoming classes.</p>
+                <p className="text-slate-500 dark:text-slate-400">Manage your availability and view upcoming classes.</p>
               </div>
-              <div className="flex gap-1 sm:gap-2 bg-white p-1 rounded-xl border border-slate-200 overflow-x-auto">
+              <div className="flex gap-1 sm:gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
                 <button
                   onClick={() => setAdminTab("schedule")}
                   className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "schedule" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
@@ -860,7 +876,7 @@ function SchedulingApp() {
                 {[0, 1].map((weekIndex) => {
                   const weekStart = addDays(startOfWeek(nowLocal(), { weekStartsOn: 1 }), weekIndex * 7);
                   return (
-                <div key={weekIndex} className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
+                <div key={weekIndex} className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl dark:shadow-black/30 p-4 sm:p-6 md:p-8 border border-slate-100 dark:border-slate-700">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-blue-600" />
                   {weekIndex === 0 ? "This Week" : "Next Week"}
@@ -907,8 +923,8 @@ function SchedulingApp() {
                                     className={`p-3 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
                                   >
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
-                                    <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
-                                    <div className="text-slate-500 text-[10px] truncate">{app.studentPhone}</div>
+                                    <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
+                                    <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
                                     <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
                                     <button
                                       onClick={() => removeAppointment(app.id)}
@@ -921,7 +937,7 @@ function SchedulingApp() {
                               })}
                             </div>
                           ) : (
-                            <div className="text-sm text-slate-300 italic py-2">No classes</div>
+                            <div className="text-sm text-slate-300 dark:text-slate-600 italic py-2">No classes</div>
                           )}
                         </div>
                       </div>
@@ -933,13 +949,13 @@ function SchedulingApp() {
                 })}
               </div>
             ) : adminTab === "availability" ? (
-              <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl dark:shadow-black/30 p-4 sm:p-6 md:p-8 border border-slate-100 dark:border-slate-700">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                     <Clock className="w-5 h-5 text-blue-600" />
                     Availability Grid
                   </h3>
-                  <div className="text-[10px] sm:text-xs text-slate-400 font-medium italic">
+                  <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-medium italic">
                     Tap to toggle
                   </div>
                 </div>
@@ -967,7 +983,7 @@ function SchedulingApp() {
                           className={`h-8 sm:h-10 rounded-lg sm:rounded-xl border transition-all ${
                             isActive
                               ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
-                              : "bg-slate-50 border-slate-100 hover:border-blue-200 active:bg-blue-50"
+                              : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-600 active:bg-blue-50 dark:active:bg-blue-950"
                           }`}
                         >
                           {isActive && <Check className="w-3 h-3 sm:w-4 sm:h-4 mx-auto" />}
@@ -978,7 +994,7 @@ function SchedulingApp() {
                 </div>
               </div>
             ) : adminTab === "history" ? (
-              <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl dark:shadow-black/30 p-4 sm:p-6 md:p-8 border border-slate-100 dark:border-slate-700">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-blue-600" />
@@ -1031,7 +1047,7 @@ function SchedulingApp() {
 
                   if (monthAppointments.length === 0) {
                     return (
-                      <div className="text-center py-12 text-slate-400">
+                      <div className="text-center py-12 text-slate-400 dark:text-slate-500">
                         <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
                         <p className="text-sm">No classes in {format(new Date(historyYear, historyMonth, 1), "MMMM yyyy")}.</p>
                       </div>
@@ -1078,7 +1094,7 @@ function SchedulingApp() {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
+                <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl dark:shadow-black/30 p-8 border border-slate-100 dark:border-slate-700">
                   <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                     <Settings className="w-5 h-5 text-blue-600" />
                     Settings
@@ -1087,7 +1103,7 @@ function SchedulingApp() {
                   <div className="space-y-8">
                     {/* Meeting Duration */}
                     <div>
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 block">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">
                         Default Meeting Duration
                       </label>
                       <div className="flex items-center gap-4">
@@ -1098,7 +1114,7 @@ function SchedulingApp() {
                             className={`px-5 py-3 rounded-xl border font-bold text-sm transition-all ${
                               adminSettings.meetingDurationMinutes === mins
                                 ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200"
-                                : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
+                                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500"
                             }`}
                           >
                             {mins} min
@@ -1110,7 +1126,7 @@ function SchedulingApp() {
 
                     {/* Google Calendar */}
                     <div>
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 block">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">
                         Google Calendar Integration
                       </label>
                       {adminSettings.googleCalendarConnected ? (
@@ -1141,7 +1157,7 @@ function SchedulingApp() {
                         </button>
                       )}
                       {adminSettings.googleCalendarConnected && (
-                        <div className="mt-4 flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl">
+                        <div className="mt-4 flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
                           <div>
                             <div className="text-sm font-bold text-slate-700">Auto-sync bookings</div>
                             <div className="text-xs text-slate-500 mt-0.5">Automatically add new classes to your Google Calendar and remove cancelled ones.</div>
@@ -1175,18 +1191,18 @@ function SchedulingApp() {
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
-          className="fixed z-[100] bg-white border border-slate-200 rounded-xl shadow-2xl py-1 min-w-[180px]"
+          className="fixed z-[100] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[180px]"
         >
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "trial")} className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 flex items-center gap-2">
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "trial")} className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400" /> Trial (30 min)
           </button>
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, null)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, null)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500" /> Normal (50 min)
           </button>
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "complete")} className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "complete")} className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 dark:hover:bg-green-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500" /> Complete
           </button>
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "no-show")} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 flex items-center gap-2">
+          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "no-show")} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500" /> No-show
           </button>
         </div>
@@ -1206,38 +1222,38 @@ function SchedulingApp() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full"
+              className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold">Admin Login</h2>
                 <button
                   onClick={() => setShowLoginModal(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Email</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Email</label>
                   <input
                     type="email"
                     value={loginEmail}
                     onChange={(e) => { setLoginEmail(e.target.value); setLoginError(""); }}
                     placeholder="admin@example.com"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Password</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Password</label>
                   <input
                     type="password"
                     value={loginPassword}
                     onChange={(e) => { setLoginPassword(e.target.value); setLoginError(""); }}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                   />
                 </div>
                 {loginError && (

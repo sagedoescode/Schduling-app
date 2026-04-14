@@ -1,0 +1,114 @@
+{
+  "availability": {
+    "4GaUqxLg206YDEgwghi0": {
+      "hour": 21,
+      "dayOfWeek": 5
+    },
+    "8KWrXdGCJiFYK3sUAqME": {
+      "dayOfWeek": 3,
+      "hour": 22
+    },
+    "9lZv1Lh90VMEBSBd4Uky": {
+      "dayOfWeek": 2,
+      "hour": 22
+    },
+    "IqtgopUBsAavfNMKzf6W": {
+      "hour": 21,
+      "dayOfWeek": 2
+    },
+    "M1cnca52LprUsvPK52Su": {
+      "dayOfWeek": 1,
+      "hour": 22
+    },
+    "dc04MwzgQePdeNFcPRjj": {
+      "hour": 0,
+      "dayOfWeek": 4
+    },
+    "smlGLlZvAoBrgDPOkdVM": {
+      "hour": 21,
+      "dayOfWeek": 1
+    },
+    "tc7mWs8Qt6gzj7De3dp2": {
+      "hour": 0,
+      "dayOfWeek": 3
+    },
+    "vtDyQz910qFiqhTk0eEE": {
+      "dayOfWeek": 2,
+      "hour": 0
+    },
+    "zRajTmV8sy6ZOueNpSzD": {
+      "hour": 21,
+      "dayOfWeek": 3
+    }
+  },
+  "appointments": {
+    "RVs0oqz92Xo0uC2lJjml": {
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1774900225,
+        "nanoseconds": 186000000
+      },
+      "studentPhone": "5566969115220",
+      "studentName": "Anderson bruni",
+      "status": "booked",
+      "endTime": "2026-03-31T01:50:00.000Z",
+      "startTime": "2026-03-31T01:00:00.000Z"
+    }
+  },
+  "gabby_availability": {
+    "E2esXgX99gJXeEaRBR5W": {
+      "hour": 21,
+      "dayOfWeek": 1
+    },
+    "JPkHF569zPiyNDS2Xidi": {
+      "hour": 0,
+      "dayOfWeek": 3
+    },
+    "Lb1o7b01hh1CYXqllD9v": {
+      "dayOfWeek": 3,
+      "hour": 22
+    },
+    "NcFhEw42oec4CzaDRzMK": {
+      "dayOfWeek": 2,
+      "hour": 0
+    },
+    "Y9we7Tc3bf31IULhH93s": {
+      "hour": 0,
+      "dayOfWeek": 4
+    },
+    "cQruFX7gyQBFokQNM5N5": {
+      "hour": 22,
+      "dayOfWeek": 2
+    },
+    "eRT6I2wnYIK7NvAPLAoK": {
+      "hour": 22,
+      "dayOfWeek": 1
+    },
+    "koo9jRtBOZcT3xcm7T60": {
+      "hour": 21,
+      "dayOfWeek": 5
+    },
+    "seeL6b2Vxd3pNum0WuCL": {
+      "hour": 21,
+      "dayOfWeek": 3
+    },
+    "veu9TlwEY8V1X9m6lxg0": {
+      "hour": 21,
+      "dayOfWeek": 2
+    }
+  },
+  "gabby_appointments": {
+    "jjVEw2An3aRKZDS1Pd0p": {
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1774903898,
+        "nanoseconds": 545000000
+      },
+      "studentPhone": "61998200316",
+      "status": "booked",
+      "studentName": "Giselly ",
+      "endTime": "2026-03-31T19:50:00.000-03:00",
+      "startTime": "2026-03-31T19:00:00.000-03:00"
+    }
+  }
+}
