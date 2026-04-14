@@ -486,12 +486,25 @@ function SchedulingApp() {
       // Fire-and-forget revoke so Google forgets the grant
       fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: "POST" }).catch(() => {});
     }
-    await saveAdminSettings({
+    // Use null (not undefined) because Firestore rejects undefined values
+    setAdminSettings(prev => ({
+      ...prev,
       googleCalendarConnected: false,
       googleAccessToken: undefined,
       googleTokenExpiry: undefined,
-    });
-    toast.success("Google Calendar disconnected");
+    }));
+    try {
+      await setDoc(doc(db, "settings", "admin"), {
+        googleCalendarConnected: false,
+        googleAccessToken: null,
+        googleTokenExpiry: null,
+        googleCalendarAutoSync: null,
+      }, { merge: true });
+      toast.success("Google Calendar disconnected");
+    } catch (error) {
+      toast.error("Failed to disconnect");
+      handleFirestoreError(error, OperationType.UPDATE, "settings/admin");
+    }
   };
 
   const handleAdminAccess = () => {
