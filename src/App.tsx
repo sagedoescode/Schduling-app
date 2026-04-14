@@ -215,7 +215,7 @@ function SchedulingApp() {
     setContextMenu(null);
   };
 
-  const lockWeeklySchedule = async (id: string, weeks: number = 8) => {
+  const lockWeeklySchedule = async (id: string, weeks: number = 4) => {
     const source = appointments.find(a => a.id === id);
     if (!source) {
       setContextMenu(null);
@@ -1068,7 +1068,7 @@ function SchedulingApp() {
                         className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all relative ${
                           isActive
                             ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
-                            : "bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-200"
+                            : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-200 dark:hover:border-blue-600"
                         }`}
                       >
                         {format(new Date(historyYear, m, 1), "MMM")}
@@ -1246,8 +1246,8 @@ function SchedulingApp() {
             <span className="w-2 h-2 rounded-full bg-red-500" /> No-show
           </button>
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
-          <button onClick={() => lockWeeklySchedule(contextMenu.appointmentId, 8)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
-            <Calendar className="w-3 h-3 text-blue-500" /> Lock weekly (8 weeks)
+          <button onClick={() => lockWeeklySchedule(contextMenu.appointmentId, 4)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+            <Calendar className="w-3 h-3 text-blue-500" /> Lock weekly (4 weeks)
           </button>
         </div>
       )}
