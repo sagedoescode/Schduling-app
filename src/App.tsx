@@ -181,7 +181,9 @@ function SchedulingApp() {
     const ts = localStorage.getItem("adminSessionTs");
     return ts && Date.now() - Number(ts) < 7 * 24 * 60 * 60 * 1000 ? "admin" : "student";
   });
-  const [adminTab, setAdminTab] = useState<"schedule" | "availability" | "settings">("schedule");
+  const [adminTab, setAdminTab] = useState<"schedule" | "availability" | "history" | "settings">("schedule");
+  const [historyMonth, setHistoryMonth] = useState<number>(new Date().getMonth());
+  const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     meetingDurationMinutes: 30,
     googleCalendarConnected: false,
@@ -409,7 +411,8 @@ function SchedulingApp() {
       await addToGoogleCalendar(studentInfo.name, selectedSlot, endTime);
 
       // WhatsApp Notification
-      const message = `Hey Lucas, this time and date suits me ${format(selectedSlot, "EEEE, d MMMM").toLowerCase()} at ${format(selectedSlot, "HH:mm")}`;
+      const tzAbbr = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(selectedSlot).find(p => p.type === "timeZoneName")?.value || tz;
+      const message = `Hey Lucas, this time and date suits me ${format(selectedSlot, "EEEE, d MMMM").toLowerCase()} at ${format(selectedSlot, "HH:mm")} (${tzAbbr})`;
       const waUrl = `https://wa.me/5592981432135?text=${encodeURIComponent(message)}`;
       window.open(waUrl, "_blank");
 
@@ -564,7 +567,10 @@ function SchedulingApp() {
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
-                  <h1 className="text-2xl font-bold">Pick a Time</h1>
+                  <div className="text-center">
+                    <h1 className="text-2xl font-bold">Pick a Time</h1>
+                    <p className="text-[11px] text-slate-400 mt-1">All times shown in your timezone · {tz}</p>
+                  </div>
                   <div className="w-10" />
                 </div>
 
@@ -680,6 +686,7 @@ function SchedulingApp() {
                 <p className="text-slate-500 mb-8 leading-relaxed">
                   Your English class is scheduled for <span className="font-bold text-slate-900">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900">{format(selectedSlot!, "HH:mm")}</span>.
                 </p>
+                <p className="text-xs text-slate-400 mb-4">Your timezone: {tz}</p>
                 <button 
                   onClick={() => {
                     setStep("info");
@@ -699,22 +706,28 @@ function SchedulingApp() {
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
                 <p className="text-slate-500">Manage your availability and view upcoming classes.</p>
               </div>
-              <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-200">
-                <button 
+              <div className="flex gap-1 sm:gap-2 bg-white p-1 rounded-xl border border-slate-200 overflow-x-auto">
+                <button
                   onClick={() => setAdminTab("schedule")}
-                  className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${adminTab === "schedule" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "schedule" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
                 >
                   Schedule
                 </button>
                 <button
                   onClick={() => setAdminTab("availability")}
-                  className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${adminTab === "availability" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "availability" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
                 >
                   Availability
                 </button>
                 <button
+                  onClick={() => setAdminTab("history")}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "history" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  History
+                </button>
+                <button
                   onClick={() => setAdminTab("settings")}
-                  className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${adminTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${adminTab === "settings" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-600 hover:bg-slate-50"}`}
                 >
                   Settings
                 </button>
@@ -822,6 +835,87 @@ function SchedulingApp() {
                     </>
                   ))}
                 </div>
+              </div>
+            ) : adminTab === "history" ? (
+              <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                  <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    History
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setHistoryYear(y => y - 1)}
+                      className="p-2 rounded-lg hover:bg-slate-50 text-slate-500"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="font-bold text-slate-700 w-16 text-center">{historyYear}</span>
+                    <button
+                      onClick={() => setHistoryYear(y => y + 1)}
+                      className="p-2 rounded-lg hover:bg-slate-50 text-slate-500"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-6">
+                  {Array.from({ length: 12 }, (_, i) => i).map(m => {
+                    const count = appointments.filter(a => a.startTime.getFullYear() === historyYear && a.startTime.getMonth() === m).length;
+                    const isActive = historyMonth === m;
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setHistoryMonth(m)}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all relative ${
+                          isActive
+                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
+                            : "bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-200"
+                        }`}
+                      >
+                        {format(new Date(historyYear, m, 1), "MMM")}
+                        {count > 0 && (
+                          <span className={`ml-1 text-[10px] ${isActive ? "text-blue-100" : "text-slate-400"}`}>({count})</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {(() => {
+                  const monthAppointments = appointments
+                    .filter(a => a.startTime.getFullYear() === historyYear && a.startTime.getMonth() === historyMonth)
+                    .sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
+
+                  if (monthAppointments.length === 0) {
+                    return (
+                      <div className="text-center py-12 text-slate-400">
+                        <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                        <p className="text-sm">No classes in {format(new Date(historyYear, historyMonth, 1), "MMMM yyyy")}.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {monthAppointments.map(app => (
+                        <div key={app.id} className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-4">
+                            <div className="text-center min-w-[60px]">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase">{format(app.startTime, "EEE")}</div>
+                              <div className="text-xl font-bold text-slate-700">{format(app.startTime, "dd")}</div>
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900">{app.studentName}</div>
+                              <div className="text-xs text-slate-500">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="space-y-6">
