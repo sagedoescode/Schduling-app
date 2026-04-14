@@ -775,52 +775,62 @@ function SchedulingApp() {
                   {weekIndex === 0 ? "This Week" : "Next Week"}
                 </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4">
+                <div className="flex flex-col divide-y divide-slate-100">
                   {[0, 1, 2, 3, 4, 5, 6].map((dayOffset) => {
                     const date = addDays(weekStart, dayOffset);
-                    const dayAppointments = appointments.filter(app =>
-                      isSameDay(app.startTime, date)
-                    );
+                    const dayAppointments = appointments
+                      .filter(app => isSameDay(app.startTime, date))
+                      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
                     const isToday = isSameDay(date, new Date());
+                    const isPastDay = date < new Date() && !isToday;
 
                     return (
-                      <div key={dayOffset} className={`flex flex-col gap-2 rounded-2xl p-3 ${isToday ? "bg-blue-50 ring-2 ring-blue-200" : ""}`}>
-                        <div className={`text-center p-2 rounded-xl ${isToday ? "bg-blue-600 text-white" : "bg-slate-50"}`}>
-                          <div className={`text-[10px] font-bold uppercase tracking-widest ${isToday ? "text-blue-100" : "text-slate-400"}`}>{format(date, "EEE")}</div>
-                          <div className="text-lg font-bold">{format(date, "dd")}</div>
+                      <div key={dayOffset} className={`flex flex-col sm:flex-row gap-3 sm:gap-5 py-4 ${isPastDay ? "opacity-60" : ""}`}>
+                        <div className={`flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 sm:w-20 flex-shrink-0 ${isToday ? "" : ""}`}>
+                          <div className={`text-xs font-bold uppercase tracking-widest ${isToday ? "text-blue-600" : "text-slate-400"}`}>
+                            {format(date, "EEE")}
+                          </div>
+                          <div className={`text-2xl font-bold leading-none ${isToday ? "text-blue-600" : "text-slate-700"}`}>
+                            {format(date, "dd")}
+                          </div>
+                          {isToday && (
+                            <div className="text-[9px] font-bold uppercase tracking-widest bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                              Today
+                            </div>
+                          )}
                         </div>
 
-                        <div className="flex flex-col gap-2">
+                        <div className="flex-1 min-w-0">
                           {dayAppointments.length > 0 ? (
-                            dayAppointments
-                              .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-                              .map((app) => {
+                            <div className="flex flex-wrap gap-2">
+                              {dayAppointments.map((app) => {
                                 const style = tagStyles[app.tag || "default"];
                                 const tagLabel = app.tag ? app.tag.replace("-", " ") : "normal";
                                 return (
-                                <div
-                                  key={app.id}
-                                  onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
-                                  }}
-                                  className={`p-3 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
-                                >
-                                  <div className="font-bold">{format(app.startTime, "HH:mm")}</div>
-                                  <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
-                                  <div className="text-slate-500 text-[10px]">{app.studentPhone}</div>
-                                  <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
-                                  <button
-                                    onClick={() => removeAppointment(app.id)}
-                                    className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                                  <div
+                                    key={app.id}
+                                    onContextMenu={(e) => {
+                                      e.preventDefault();
+                                      setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
+                                    }}
+                                    className={`p-3 border rounded-xl text-xs group relative cursor-context-menu w-[160px] ${style}`}
                                   >
-                                    Cancel
-                                  </button>
-                                </div>
+                                    <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
+                                    <div className="font-medium text-slate-700 truncate">{app.studentName}</div>
+                                    <div className="text-slate-500 text-[10px] truncate">{app.studentPhone}</div>
+                                    <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
+                                    <button
+                                      onClick={() => removeAppointment(app.id)}
+                                      className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
                                 );
-                              })
+                              })}
+                            </div>
                           ) : (
-                            <div className="text-center py-3 text-slate-300 text-[10px] italic">No classes</div>
+                            <div className="text-sm text-slate-300 italic py-2">No classes</div>
                           )}
                         </div>
                       </div>
