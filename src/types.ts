@@ -24,6 +24,7 @@ export interface Appointment {
   status: 'booked' | 'cancelled';
   tag?: AppointmentTag;
   googleCalendarEventId?: string;
+  recurring?: boolean;
 }
 
 export interface AdminSettings {

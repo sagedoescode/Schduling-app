@@ -201,7 +201,7 @@ function SchedulingApp() {
     trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
     "no-show": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300",
     complete: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300",
-    default: "bg-blue-50 border-blue-100 text-blue-700",
+    default: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300",
   };
 
   const setAppointmentTag = async (id: string, tag: AppointmentTag | null) => {
@@ -213,6 +213,46 @@ function SchedulingApp() {
       handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
     }
     setContextMenu(null);
+  };
+
+  const lockWeeklySchedule = async (id: string, weeks: number = 8) => {
+    const source = appointments.find(a => a.id === id);
+    if (!source) {
+      setContextMenu(null);
+      return;
+    }
+    setContextMenu(null);
+    const startTime = source.startTime instanceof Date ? source.startTime : new Date(source.startTime);
+    const endTime = source.endTime instanceof Date ? source.endTime : new Date(source.endTime);
+    let created = 0;
+    try {
+      for (let i = 1; i <= weeks; i++) {
+        const newStart = addDays(startTime, 7 * i);
+        const newEnd = addDays(endTime, 7 * i);
+        // Skip if a booking already exists at that exact time
+        const conflict = appointments.some(a => a.startTime.getTime() === newStart.getTime());
+        if (conflict) continue;
+        const docRef = await addDoc(collection(db, "appointments"), {
+          studentName: source.studentName,
+          studentPhone: source.studentPhone,
+          startTime: newStart.toISOString(),
+          endTime: newEnd.toISOString(),
+          status: "booked",
+          tag: source.tag ?? null,
+          recurring: true,
+          createdAt: serverTimestamp()
+        });
+        const eventId = await addToGoogleCalendar(source.studentName, newStart, newEnd);
+        if (eventId) {
+          await updateDoc(doc(db, "appointments", docRef.id), { googleCalendarEventId: eventId });
+        }
+        created++;
+      }
+      toast.success(`Locked ${created} weekly ${created === 1 ? "class" : "classes"} for ${source.studentName}`);
+    } catch (error) {
+      toast.error("Failed to lock weekly schedule");
+      handleFirestoreError(error, OperationType.CREATE, "appointments");
+    }
   };
 
   useEffect(() => {
@@ -821,7 +861,7 @@ function SchedulingApp() {
                 </div>
                 <h1 className="text-3xl font-bold mb-4">Booked!</h1>
                 <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                  Your English class is scheduled for <span className="font-bold text-slate-900">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900">{format(selectedSlot!, "HH:mm")}</span>.
+                  Your English class is scheduled for <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "HH:mm")}</span>.
                 </p>
                 <p className="text-xs text-slate-400 mb-4">Your timezone: {tz}</p>
                 <button 
@@ -1058,11 +1098,11 @@ function SchedulingApp() {
                     <div className="space-y-2">
                       {monthAppointments.map(app => {
                         const tagColors: Record<string, string> = {
-                          trial: "bg-amber-50 border-amber-200",
-                          "no-show": "bg-red-50 border-red-200",
-                          complete: "bg-green-50 border-green-200",
+                          trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
+                          "no-show": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
+                          complete: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",
                         };
-                        const bgClass = app.tag ? tagColors[app.tag] : "bg-slate-50 border-slate-100";
+                        const bgClass = app.tag ? tagColors[app.tag] : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700";
                         return (
                         <div
                           key={app.id}
@@ -1075,10 +1115,10 @@ function SchedulingApp() {
                           <div className="flex items-center gap-4">
                             <div className="text-center min-w-[60px]">
                               <div className="text-[10px] font-bold text-slate-400 uppercase">{format(app.startTime, "EEE")}</div>
-                              <div className="text-xl font-bold text-slate-700">{format(app.startTime, "dd")}</div>
+                              <div className="text-xl font-bold text-slate-700 dark:text-slate-200">{format(app.startTime, "dd")}</div>
                             </div>
                             <div>
-                              <div className="font-bold text-slate-900">{app.studentName}</div>
+                              <div className="font-bold text-slate-900 dark:text-slate-100">{app.studentName}</div>
                               <div className="text-xs text-slate-500">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
                             </div>
                           </div>
@@ -1204,6 +1244,10 @@ function SchedulingApp() {
           </button>
           <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "no-show")} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500" /> No-show
+          </button>
+          <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+          <button onClick={() => lockWeeklySchedule(contextMenu.appointmentId, 8)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+            <Calendar className="w-3 h-3 text-blue-500" /> Lock weekly (8 weeks)
           </button>
         </div>
       )}
