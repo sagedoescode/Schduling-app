@@ -1046,7 +1046,7 @@ function SchedulingApp() {
                         Default Meeting Duration
                       </label>
                       <div className="flex items-center gap-4">
-                        {[15, 30, 45, 60].map(mins => (
+                        {[30, 50].map(mins => (
                           <button
                             key={mins}
                             onClick={() => saveAdminSettings({ meetingDurationMinutes: mins })}
@@ -1060,7 +1060,7 @@ function SchedulingApp() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-xs text-slate-400 mt-2">Currently set to {adminSettings.meetingDurationMinutes} minutes per class.</p>
+                      <p className="text-xs text-slate-400 mt-2">30 min for trial classes, 50 min for normal. Currently default: {adminSettings.meetingDurationMinutes} min.</p>
                     </div>
 
                     {/* Google Calendar */}
