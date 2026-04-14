@@ -767,7 +767,7 @@ function SchedulingApp() {
             {adminTab === "schedule" ? (
               <div className="space-y-6">
                 {[0, 1].map((weekIndex) => {
-                  const weekStart = addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), weekIndex * 7);
+                  const weekStart = addDays(startOfWeek(nowLocal(), { weekStartsOn: 1 }), weekIndex * 7);
                   return (
                 <div key={weekIndex} className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-slate-100">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
