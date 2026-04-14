@@ -286,11 +286,12 @@ function SchedulingApp() {
     };
   }, []);
 
-  const saveAdminSettings = async (updates: Partial<AdminSettings>) => {
+  const saveAdminSettings = async (updates: Partial<AdminSettings>, opts?: { silent?: boolean }) => {
+    // Optimistic local update first so UI reflects change immediately
+    setAdminSettings(prev => ({ ...prev, ...updates }));
     try {
-      await setDoc(doc(db, "settings", "admin"), { ...adminSettings, ...updates }, { merge: true });
-      setAdminSettings(prev => ({ ...prev, ...updates }));
-      toast.success("Settings saved");
+      await setDoc(doc(db, "settings", "admin"), updates, { merge: true });
+      if (!opts?.silent) toast.success("Settings saved");
     } catch (error) {
       toast.error("Failed to save settings");
     }
@@ -324,7 +325,7 @@ function SchedulingApp() {
             googleCalendarConnected: true,
             googleAccessToken: resp.access_token,
             googleTokenExpiry: expiry,
-          });
+          }, { silent: true });
           resolve?.(resp.access_token);
         },
       });
