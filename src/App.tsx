@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Component, ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, Component, ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
 import { 
@@ -296,42 +296,77 @@ function SchedulingApp() {
     }
   };
 
-  const connectGoogleCalendar = () => {
+  const tokenClientRef = useRef<any>(null);
+  const pendingResolverRef = useRef<((token: string | null) => void) | null>(null);
+
+  // Initialize Google Identity Services token client once script loads
+  useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
+    if (!clientId) return;
+    const init = () => {
+      const g: any = (window as any).google;
+      if (!g?.accounts?.oauth2) {
+        setTimeout(init, 300);
+        return;
+      }
+      tokenClientRef.current = g.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: "https://www.googleapis.com/auth/calendar.events",
+        callback: (resp: any) => {
+          const resolve = pendingResolverRef.current;
+          pendingResolverRef.current = null;
+          if (resp.error || !resp.access_token) {
+            resolve?.(null);
+            return;
+          }
+          const expiry = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+          saveAdminSettings({
+            googleCalendarConnected: true,
+            googleAccessToken: resp.access_token,
+            googleTokenExpiry: expiry,
+          });
+          resolve?.(resp.access_token);
+        },
+      });
+    };
+    init();
+  }, []);
+
+  const requestToken = (interactive: boolean): Promise<string | null> => {
+    return new Promise(resolve => {
+      if (!tokenClientRef.current) {
+        resolve(null);
+        return;
+      }
+      pendingResolverRef.current = resolve;
+      tokenClientRef.current.requestAccessToken({ prompt: interactive ? "consent" : "" });
+    });
+  };
+
+  const connectGoogleCalendar = async () => {
+    if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
       toast.error("Google Client ID not configured. Add VITE_GOOGLE_CLIENT_ID to .env");
       return;
     }
-    const redirectUri = window.location.origin;
-    const scope = "https://www.googleapis.com/auth/calendar.events";
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=consent&include_granted_scopes=true`;
-    window.location.href = url;
+    const token = await requestToken(true);
+    if (token) toast.success("Google Calendar connected!");
+    else toast.error("Failed to connect Google Calendar");
   };
 
-  // Handle Google OAuth callback
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes("access_token")) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get("access_token");
-      const expiresIn = params.get("expires_in");
-      if (accessToken) {
-        const expiry = Date.now() + Number(expiresIn || 3600) * 1000;
-        saveAdminSettings({
-          googleCalendarConnected: true,
-          googleAccessToken: accessToken,
-          googleTokenExpiry: expiry,
-        });
-        window.history.replaceState(null, "", window.location.pathname);
-        toast.success("Google Calendar connected!");
-      }
+  const getValidAccessToken = async (): Promise<string | null> => {
+    const { googleAccessToken, googleTokenExpiry } = adminSettings;
+    if (googleAccessToken && googleTokenExpiry && Date.now() < googleTokenExpiry - 60000) {
+      return googleAccessToken;
     }
-  }, []);
+    // Silent refresh
+    return requestToken(false);
+  };
 
   const addToGoogleCalendar = async (studentName: string, start: Date, end: Date) => {
-    if (!adminSettings.googleCalendarConnected || !adminSettings.googleAccessToken) return;
-    if (adminSettings.googleTokenExpiry && Date.now() > adminSettings.googleTokenExpiry) {
-      toast.error("Google Calendar token expired. Please reconnect in Settings.");
+    if (!adminSettings.googleCalendarConnected) return;
+    const token = await getValidAccessToken();
+    if (!token) {
+      toast.error("Google Calendar session expired. Please reconnect in Settings.");
       return;
     }
     try {
@@ -344,19 +379,30 @@ function SchedulingApp() {
       const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${adminSettings.googleAccessToken}`,
+          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(event),
       });
-      if (res.ok) {
-        console.log("Google Calendar event created");
-      } else {
+      if (!res.ok) {
         console.error("Failed to create calendar event:", await res.text());
       }
     } catch (e) {
       console.error("Google Calendar error:", e);
     }
+  };
+
+  const disconnectGoogleCalendar = async () => {
+    const token = adminSettings.googleAccessToken;
+    const g: any = (window as any).google;
+    if (token && g?.accounts?.oauth2) {
+      g.accounts.oauth2.revoke(token, () => {});
+    }
+    await saveAdminSettings({
+      googleCalendarConnected: false,
+      googleAccessToken: undefined,
+      googleTokenExpiry: undefined,
+    });
   };
 
   const handleAdminAccess = () => {
@@ -1029,7 +1075,7 @@ function SchedulingApp() {
                             <span className="text-sm font-bold text-green-700">Connected</span>
                           </div>
                           <button
-                            onClick={() => saveAdminSettings({ googleCalendarConnected: false, googleAccessToken: undefined, googleTokenExpiry: undefined })}
+                            onClick={disconnectGoogleCalendar}
                             className="px-4 py-3 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors"
                           >
                             Disconnect
