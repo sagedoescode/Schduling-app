@@ -1474,29 +1474,6 @@ function SchedulingApp() {
                   </h3>
 
                   <div className="space-y-8">
-                    {/* Meeting Duration */}
-                    <div>
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">
-                        Default Meeting Duration
-                      </label>
-                      <div className="flex items-center gap-4">
-                        {[30, 50].map(mins => (
-                          <button
-                            key={mins}
-                            onClick={() => saveAdminSettings({ meetingDurationMinutes: mins })}
-                            className={`px-5 py-3 rounded-xl border font-bold text-sm transition-all ${
-                              adminSettings.meetingDurationMinutes === mins
-                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none"
-                                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500"
-                            }`}
-                          >
-                            {mins} min
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-2">30 min for trial classes, 50 min for normal. Currently default: {adminSettings.meetingDurationMinutes} min.</p>
-                    </div>
-
                     {/* Google Calendar */}
                     <div>
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">
