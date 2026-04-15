@@ -20,7 +20,9 @@ import {
   AlertCircle,
   Moon,
   Sun,
-  MoreVertical
+  MoreVertical,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import {
   format,
@@ -54,7 +56,10 @@ import {
 import { 
   signInWithEmailAndPassword,
   onAuthStateChanged,
-  signOut
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from "firebase/auth";
 import { db, auth, OperationType, handleFirestoreError } from "./firebase";
 import { TimeSlot, Availability, Appointment, AdminSettings, AppointmentTag } from "./types";
@@ -367,6 +372,8 @@ function SchedulingApp() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [step, setStep] = useState<"info" | "schedule" | "success">("info");
   const [studentInfo, setStudentInfo] = useState({ name: "", phone: "" });
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
@@ -690,15 +697,28 @@ function SchedulingApp() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError("");
     if (loginEmail !== ADMIN_EMAIL) {
       setLoginError("Invalid email or password");
       return;
     }
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       setShowLoginModal(false);
-    } catch {
-      setLoginError("Invalid email or password");
+    } catch (err: any) {
+      const code = err?.code || "";
+      if (code === "auth/user-not-found" || code === "auth/invalid-credential" || code === "auth/wrong-password") {
+        setLoginError("Invalid email or password");
+      } else if (code === "auth/too-many-requests") {
+        setLoginError("Too many attempts. Try again later.");
+      } else if (code === "auth/network-request-failed") {
+        setLoginError("Network error - check your connection");
+      } else if (code === "auth/operation-not-allowed") {
+        setLoginError("Email/Password sign-in not enabled in Firebase Console");
+      } else {
+        setLoginError(code ? `Login failed (${code})` : "Login failed");
+      }
     }
   };
 
@@ -1638,14 +1658,33 @@ function SchedulingApp() {
                 </div>
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Password</label>
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => { setLoginPassword(e.target.value); setLoginError(""); }}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => { setLoginPassword(e.target.value); setLoginError(""); }}
+                      placeholder="••••••••"
+                      className="w-full px-4 pr-12 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remember me
+                </label>
                 {loginError && (
                   <p className="text-red-500 text-sm font-medium">{loginError}</p>
                 )}
