@@ -380,6 +380,29 @@ function SchedulingApp() {
 
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
+  const [selectedClassKind, setSelectedClassKind] = useState<"trial" | "normal30" | "normal50">("normal50");
+
+  // Pricing (BRL)
+  const priceFor = (app: Appointment): number => {
+    const { classType, outcome } = resolveAppointment(app);
+    if (outcome !== "complete") return 0;
+    if (classType === "trial") return 10;
+    const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+    const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
+    const duration = (end.getTime() - start.getTime()) / 60000;
+    return duration < 45 ? 19 : 35;
+  };
+
+  const weeklyEarnings = useMemo(() => {
+    const now = new Date();
+    const start = startOfWeek(now, { weekStartsOn: 1 });
+    const end = addDays(start, 7);
+    return appointments.reduce((sum, app) => {
+      const t = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+      if (t >= start && t < end) return sum + priceFor(app);
+      return sum;
+    }, 0);
+  }, [appointments]);
   const [lastBookingId, setLastBookingId] = useState<string | null>(() => {
     try {
       const raw = localStorage.getItem("lastBooking");
@@ -690,7 +713,8 @@ function SchedulingApp() {
     if (!selectedSlot || !studentInfo.name || !studentInfo.phone) return;
 
     const path = "appointments";
-    const duration = adminSettings.meetingDurationMinutes || 30;
+    const duration = selectedClassKind === "normal50" ? 50 : 30;
+    const classType: "trial" | "normal" = selectedClassKind === "trial" ? "trial" : "normal";
     const endTime = addMinutes(selectedSlot, duration);
     try {
       const docRef = await addDoc(collection(db, path), {
@@ -699,6 +723,7 @@ function SchedulingApp() {
         startTime: selectedSlot.toISOString(),
         endTime: endTime.toISOString(),
         status: "booked",
+        classType,
         createdAt: serverTimestamp()
       });
 
@@ -1017,6 +1042,25 @@ function SchedulingApp() {
                             Book Now
                           </button>
                         </div>
+                        <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
+                          {([
+                            { key: "trial", label: "Trial (30 min)" },
+                            { key: "normal30", label: "Normal (30 min)" },
+                            { key: "normal50", label: "Normal (50 min)" },
+                          ] as const).map(opt => (
+                            <button
+                              key={opt.key}
+                              onClick={() => setSelectedClassKind(opt.key)}
+                              className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                                selectedClassKind === opt.key
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "bg-transparent border-white/20 text-slate-300 hover:border-white/40"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
                         <p className="text-[11px] text-slate-400 mt-3 leading-relaxed text-center sm:text-left">
                           Ao agendar, você concorda em enviar uma confirmação pelo WhatsApp até 1 hora antes da aula. Sem confirmação, a aula será reagendada. Em caso de não comparecimento nos primeiros 10 minutos, a aula será cancelada e precisará ser remarcada.
                         </p>
@@ -1086,6 +1130,10 @@ function SchedulingApp() {
               <div>
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
                 <p className="text-slate-500 dark:text-slate-400">Manage your availability and view upcoming classes.</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  This week: <span className="font-bold text-green-600 dark:text-green-400">R$ {weeklyEarnings.toFixed(2)}</span>
+                  <span className="opacity-60"> · earnings from completed classes</span>
+                </p>
               </div>
               <div className="flex gap-1 sm:gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
                 <button
@@ -1157,6 +1205,9 @@ function SchedulingApp() {
                               {dayAppointments.map((app) => {
                                 const style = cardStyleFor(app);
                                 const { classType, outcome } = resolveAppointment(app);
+                                const startT = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+                                const endT = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
+                                const durMin = Math.round((endT.getTime() - startT.getTime()) / 60000);
                                 return (
                                   <div
                                     key={app.id}
@@ -1176,7 +1227,7 @@ function SchedulingApp() {
                                     >
                                       <MoreVertical className="w-4 h-4 opacity-60" />
                                     </button>
-                                    <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
+                                    <div className="font-bold text-sm">{format(app.startTime, "HH:mm")} <span className="text-[10px] font-medium opacity-70">({durMin}m)</span></div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
                                     {outcome ? (
