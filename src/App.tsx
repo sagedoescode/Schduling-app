@@ -1179,9 +1179,13 @@ function SchedulingApp() {
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
-                                    <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{classType}</div>
-                                    {outcome && (
-                                      <div className="text-[9px] font-bold uppercase tracking-wider opacity-70">{outcome.replace("-", " ")}</div>
+                                    {outcome ? (
+                                      <>
+                                        <div className="text-[10px] font-bold uppercase tracking-wider mt-1">{outcome.replace("-", " ")}</div>
+                                        <div className="text-[8px] font-bold uppercase tracking-wider opacity-60">{classType}</div>
+                                      </>
+                                    ) : (
+                                      <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{classType}</div>
                                     )}
                                     <button
                                       onClick={() => removeAppointment(app.id)}
@@ -1348,9 +1352,15 @@ function SchedulingApp() {
                               <div className="text-xs text-slate-500 dark:text-slate-400">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <span>{classType}</span>
-                            {outcome && <span>{outcome.replace("-", " ")}</span>}
+                          <div className="flex flex-col items-end font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {outcome ? (
+                              <>
+                                <span className="text-[11px]">{outcome.replace("-", " ")}</span>
+                                <span className="text-[9px] opacity-70">{classType}</span>
+                              </>
+                            ) : (
+                              <span className="text-[10px]">{classType}</span>
+                            )}
                           </div>
                         </div>
                         );
