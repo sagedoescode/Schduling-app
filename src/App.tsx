@@ -329,6 +329,8 @@ function SchedulingApp() {
 
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
+  const [lastBookingId, setLastBookingId] = useState<string | null>(null);
+  const [lastBookingEventId, setLastBookingEventId] = useState<string | null>(null);
 
   useEffect(() => {
     const testConnection = async () => {
@@ -473,7 +475,11 @@ function SchedulingApp() {
     if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return null;
     const token = await getValidAccessToken();
     if (!token) {
-      toast.error("Google Calendar session expired. Please reconnect in Settings.");
+      // Token expired and silent refresh failed - silently mark as disconnected
+      // so the user sees the Connect button next time they open Settings
+      // without being spammed with error toasts on every booking.
+      setAdminSettings(prev => ({ ...prev, googleCalendarConnected: false }));
+      setDoc(doc(db, "settings", "admin"), { googleCalendarConnected: false }, { merge: true }).catch(() => {});
       return null;
     }
     try {
@@ -506,7 +512,11 @@ function SchedulingApp() {
   const removeFromGoogleCalendar = async (eventId: string) => {
     if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return;
     const token = await getValidAccessToken();
-    if (!token) return;
+    if (!token) {
+      setAdminSettings(prev => ({ ...prev, googleCalendarConnected: false }));
+      setDoc(doc(db, "settings", "admin"), { googleCalendarConnected: false }, { merge: true }).catch(() => {});
+      return;
+    }
     try {
       await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
         method: "DELETE",
@@ -620,10 +630,14 @@ function SchedulingApp() {
         createdAt: serverTimestamp()
       });
 
+      setLastBookingId(docRef.id);
+      setLastBookingEventId(null);
+
       // Add to Google Calendar if connected + auto-sync enabled
       const eventId = await addToGoogleCalendar(studentInfo.name, selectedSlot, endTime);
       if (eventId) {
         await updateDoc(doc(db, path, docRef.id), { googleCalendarEventId: eventId });
+        setLastBookingEventId(eventId);
       }
 
       // WhatsApp Notification
@@ -914,15 +928,40 @@ function SchedulingApp() {
                   Your English class is scheduled for <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "HH:mm")}</span>.
                 </p>
                 <p className="text-xs text-slate-400 mb-4">Your timezone: {tz}</p>
-                <button 
+                <button
                   onClick={() => {
                     setStep("info");
                     setSelectedSlot(null);
+                    setLastBookingId(null);
+                    setLastBookingEventId(null);
                   }}
-                  className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors"
+                  className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors mb-2"
                 >
                   Schedule Another
                 </button>
+                {lastBookingId && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Cancelar esta aula? Esta ação não pode ser desfeita.")) return;
+                      try {
+                        await deleteDoc(doc(db, "appointments", lastBookingId));
+                        if (lastBookingEventId) {
+                          await removeFromGoogleCalendar(lastBookingEventId);
+                        }
+                        toast.success("Aula cancelada");
+                        setLastBookingId(null);
+                        setLastBookingEventId(null);
+                        setSelectedSlot(null);
+                        setStep("info");
+                      } catch (e) {
+                        toast.error("Não foi possível cancelar");
+                      }
+                    }}
+                    className="w-full text-red-500 dark:text-red-400 font-medium text-sm py-2 hover:underline transition-colors"
+                  >
+                    Marcou errado? Cancelar esta aula
+                  </button>
+                )}
               </motion.div>
             )}
           </div>
@@ -1329,6 +1368,17 @@ function SchedulingApp() {
               </button>
             );
           })()}
+          <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+          <button
+            onClick={() => {
+              const id = contextMenu.appointmentId;
+              setContextMenu(null);
+              if (confirm("Cancel this class?")) removeAppointment(id);
+            }}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2 text-red-600 dark:text-red-400"
+          >
+            <Trash2 className="w-3 h-3" /> Cancel class
+          </button>
         </div>
       )}
 
