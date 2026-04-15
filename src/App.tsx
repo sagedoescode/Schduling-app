@@ -1173,8 +1173,8 @@ function SchedulingApp() {
           <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                <p className="text-slate-500 dark:text-slate-400">Manage your availability and view upcoming classes.</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-700 dark:text-slate-200">Admin Dashboard</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Manage your availability and view upcoming classes.</p>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   This week: <span className="font-bold text-green-600 dark:text-green-400">R$ {weeklyEarnings.toFixed(2)}</span>
                   <span className="opacity-60"> · {weeklyHours.toFixed(1)}h scheduled</span>
