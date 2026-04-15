@@ -216,6 +216,42 @@ function SchedulingApp() {
     setContextMenu(null);
   };
 
+  const unlockWeeklySchedule = async (id: string) => {
+    const source = appointments.find(a => a.id === id);
+    if (!source) {
+      setContextMenu(null);
+      return;
+    }
+    setContextMenu(null);
+    const sourceStart = source.startTime instanceof Date ? source.startTime : new Date(source.startTime);
+    const sourceDay = sourceStart.getDay();
+    const sourceHour = sourceStart.getHours();
+    const sourceMinute = sourceStart.getMinutes();
+    const now = new Date();
+    // Find all future recurring appointments for same student at same day/time
+    const toDelete = appointments.filter(a => {
+      if (a.studentName !== source.studentName) return false;
+      if (!a.recurring && a.id !== id) return false;
+      const t = a.startTime instanceof Date ? a.startTime : new Date(a.startTime);
+      if (t < now) return false;
+      return t.getDay() === sourceDay && t.getHours() === sourceHour && t.getMinutes() === sourceMinute;
+    });
+    let deleted = 0;
+    try {
+      for (const app of toDelete) {
+        await deleteDoc(doc(db, "appointments", app.id));
+        if (app.googleCalendarEventId) {
+          await removeFromGoogleCalendar(app.googleCalendarEventId);
+        }
+        deleted++;
+      }
+      toast.success(`Unlocked and removed ${deleted} future ${deleted === 1 ? "class" : "classes"} for ${source.studentName}`);
+    } catch (error) {
+      toast.error("Failed to unlock weekly schedule");
+      handleFirestoreError(error, OperationType.DELETE, "appointments");
+    }
+  };
+
   const lockWeeklySchedule = async (id: string, weeks: number = 4) => {
     const source = appointments.find(a => a.id === id);
     if (!source) {
@@ -1280,9 +1316,19 @@ function SchedulingApp() {
             <span className="w-2 h-2 rounded-full bg-red-500" /> No-show
           </button>
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
-          <button onClick={() => lockWeeklySchedule(contextMenu.appointmentId, 4)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
-            <Calendar className="w-3 h-3 text-blue-500" /> Lock weekly (4 weeks)
-          </button>
+          {(() => {
+            const app = appointments.find(a => a.id === contextMenu.appointmentId);
+            const isRecurring = !!app?.recurring;
+            return isRecurring ? (
+              <button onClick={() => unlockWeeklySchedule(contextMenu.appointmentId)} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2">
+                <X className="w-3 h-3 text-red-500" /> Unlock weekly (remove future)
+              </button>
+            ) : (
+              <button onClick={() => lockWeeklySchedule(contextMenu.appointmentId, 4)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+                <Calendar className="w-3 h-3 text-blue-500" /> Lock weekly (4 weeks)
+              </button>
+            );
+          })()}
         </div>
       )}
 
