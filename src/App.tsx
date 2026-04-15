@@ -288,19 +288,21 @@ function SchedulingApp() {
       return t.getDay() === sourceDay && t.getHours() === sourceHour && t.getMinutes() === sourceMinute;
     });
     let deleted = 0;
-    try {
-      for (const app of toDelete) {
+    let failed = 0;
+    for (const app of toDelete) {
+      try {
         await deleteDoc(doc(db, "appointments", app.id));
         if (app.googleCalendarEventId) {
           await removeFromGoogleCalendar(app.googleCalendarEventId);
         }
         deleted++;
+      } catch {
+        failed++;
       }
-      toast.success(`Unlocked and removed ${deleted} future ${deleted === 1 ? "class" : "classes"} for ${source.studentName}`);
-    } catch (error) {
-      toast.error("Failed to unlock weekly schedule");
-      handleFirestoreError(error, OperationType.DELETE, "appointments");
     }
+    if (failed > 0 && deleted > 0) toast.success(`Removed ${deleted}, ${failed} failed`);
+    else if (failed > 0) toast.error("Failed to unlock weekly schedule");
+    else toast.success(`Unlocked ${deleted} future ${deleted === 1 ? "class" : "classes"} for ${source.studentName}`);
   };
 
   const lockWeeklySchedule = async (id: string, weeks: number = 4) => {
@@ -327,6 +329,7 @@ function SchedulingApp() {
           endTime: newEnd.toISOString(),
           status: "booked",
           tag: source.tag ?? null,
+          classType: source.classType ?? null,
           recurring: true,
           createdAt: serverTimestamp()
         });
@@ -365,19 +368,6 @@ function SchedulingApp() {
   const [studentInfo, setStudentInfo] = useState({ name: "", phone: "" });
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if(error instanceof Error && error.message.includes('the client is offline')) {
-          toast.error("Firebase connection failed. Please check your configuration.");
-        }
-      }
-    };
-    testConnection();
-  }, []);
-
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [selectedClassKind, setSelectedClassKind] = useState<"trial" | "normal30" | "normal50">("normal50");
@@ -402,6 +392,21 @@ function SchedulingApp() {
       if (t >= start && t < end) return sum + priceFor(app);
       return sum;
     }, 0);
+  }, [appointments]);
+
+  const weeklyHours = useMemo(() => {
+    const now = new Date();
+    const start = startOfWeek(now, { weekStartsOn: 1 });
+    const end = addDays(start, 7);
+    const mins = appointments.reduce((sum, app) => {
+      const t = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+      if (t < start || t >= end) return sum;
+      if (app.status === "cancelled") return sum;
+      const s = t.getTime();
+      const e = (app.endTime instanceof Date ? app.endTime : new Date(app.endTime)).getTime();
+      return sum + (e - s) / 60000;
+    }, 0);
+    return mins / 60;
   }, [appointments]);
   const [lastBookingId, setLastBookingId] = useState<string | null>(() => {
     try {
@@ -809,9 +814,6 @@ function SchedulingApp() {
     }
   };
 
-  if (view === "student" && step === "info" && !studentInfo.name && !studentInfo.phone && false) {
-    // This block is removed as we don't want a separate login screen anymore
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors">
@@ -1132,7 +1134,7 @@ function SchedulingApp() {
                 <p className="text-slate-500 dark:text-slate-400">Manage your availability and view upcoming classes.</p>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   This week: <span className="font-bold text-green-600 dark:text-green-400">R$ {weeklyEarnings.toFixed(2)}</span>
-                  <span className="opacity-60"> · earnings from completed classes</span>
+                  <span className="opacity-60"> · {weeklyHours.toFixed(1)}h scheduled</span>
                 </p>
               </div>
               <div className="flex gap-1 sm:gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
@@ -1518,8 +1520,8 @@ function SchedulingApp() {
       {contextMenu && (
         <div
           style={{
-            top: Math.min(contextMenu.y, window.innerHeight - 340),
-            left: Math.min(contextMenu.x, window.innerWidth - 200),
+            top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - 340)),
+            left: Math.max(8, Math.min(contextMenu.x, window.innerWidth - 200)),
           }}
           onClick={(e) => e.stopPropagation()}
           className="fixed z-[100] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[180px]"
