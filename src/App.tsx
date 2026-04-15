@@ -192,7 +192,6 @@ function SchedulingApp() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [view, setView] = useState<"student" | "admin">("student");
 
-  // Subscribe to Firebase Auth state - persists across refreshes automatically
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       const loggedIn = !!user && user.email === ADMIN_EMAIL;
@@ -715,7 +714,7 @@ function SchedulingApp() {
       } else if (code === "auth/network-request-failed") {
         setLoginError("Network error - check your connection");
       } else if (code === "auth/operation-not-allowed") {
-        setLoginError("Email/Password sign-in not enabled in Firebase Console");
+        setLoginError("Email/Password not enabled yet - ask Claude");
       } else {
         setLoginError(code ? `Login failed (${code})` : "Login failed");
       }
@@ -723,9 +722,7 @@ function SchedulingApp() {
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch {}
+    try { await signOut(auth); } catch {}
     setView("student");
   };
 
