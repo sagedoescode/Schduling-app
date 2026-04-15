@@ -14,6 +14,8 @@ export interface Availability {
 }
 
 export type AppointmentTag = 'trial' | 'no-show' | 'complete';
+export type ClassType = 'trial' | 'normal';
+export type Outcome = 'complete' | 'no-show';
 
 export interface Appointment {
   id: string;
@@ -22,7 +24,9 @@ export interface Appointment {
   startTime: Date;
   endTime: Date;
   status: 'booked' | 'cancelled';
-  tag?: AppointmentTag;
+  tag?: AppointmentTag; // legacy - still supported for reads
+  classType?: ClassType;
+  outcome?: Outcome;
   googleCalendarEventId?: string;
   recurring?: boolean;
 }

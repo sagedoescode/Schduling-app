@@ -205,7 +205,19 @@ function SchedulingApp() {
     default: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300",
   };
 
+  // Outcome wins over classType for card color (complete/no-show override trial/normal visual)
+  const cardStyleFor = (app: Appointment) => {
+    const { classType, outcome } = resolveAppointment(app);
+    if (outcome === "complete") return tagStyles.complete;
+    if (outcome === "no-show") return tagStyles["no-show"];
+    if (classType === "trial") return tagStyles.trial;
+    return tagStyles.default;
+  };
+
   const setAppointmentTag = async (id: string, tag: AppointmentTag | null) => {
+    // Legacy helper kept for any existing callers. New UI uses
+    // setClassType / setOutcome below so class type (trial/normal) and
+    // outcome (complete/no-show) can coexist on the same card.
     try {
       await updateDoc(doc(db, "appointments", id), { tag: tag ?? null });
       toast.success(tag ? `Marked as ${tag}` : "Tag cleared");
@@ -214,6 +226,38 @@ function SchedulingApp() {
       handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
     }
     setContextMenu(null);
+  };
+
+  const setClassType = async (id: string, classType: "trial" | "normal") => {
+    try {
+      await updateDoc(doc(db, "appointments", id), { classType, tag: null });
+      toast.success(`Marked as ${classType}`);
+    } catch (error) {
+      toast.error("Failed to update");
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
+    setContextMenu(null);
+  };
+
+  const setOutcome = async (id: string, outcome: "complete" | "no-show" | null) => {
+    try {
+      await updateDoc(doc(db, "appointments", id), { outcome: outcome ?? null });
+      toast.success(outcome ? `Marked as ${outcome}` : "Outcome cleared");
+    } catch (error) {
+      toast.error("Failed to update");
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
+    setContextMenu(null);
+  };
+
+  // Resolve class type + outcome handling legacy tag field
+  const resolveAppointment = (app: Appointment) => {
+    const legacy = app.tag;
+    const classType: "trial" | "normal" =
+      app.classType ?? (legacy === "trial" ? "trial" : "normal");
+    const outcome: "complete" | "no-show" | undefined =
+      app.outcome ?? (legacy === "complete" ? "complete" : legacy === "no-show" ? "no-show" : undefined);
+    return { classType, outcome };
   };
 
   const unlockWeeklySchedule = async (id: string) => {
@@ -329,8 +373,29 @@ function SchedulingApp() {
 
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
-  const [lastBookingId, setLastBookingId] = useState<string | null>(null);
-  const [lastBookingEventId, setLastBookingEventId] = useState<string | null>(null);
+  const [lastBookingId, setLastBookingId] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem("lastBooking");
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      // Expire if class already started
+      if (data.startTime && new Date(data.startTime).getTime() < Date.now()) {
+        localStorage.removeItem("lastBooking");
+        return null;
+      }
+      return data.id || null;
+    } catch {
+      return null;
+    }
+  });
+  const [lastBookingEventId, setLastBookingEventId] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem("lastBooking");
+      return raw ? (JSON.parse(raw).eventId || null) : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     const testConnection = async () => {
@@ -632,12 +697,21 @@ function SchedulingApp() {
 
       setLastBookingId(docRef.id);
       setLastBookingEventId(null);
+      localStorage.setItem("lastBooking", JSON.stringify({
+        id: docRef.id,
+        startTime: selectedSlot.toISOString(),
+      }));
 
       // Add to Google Calendar if connected + auto-sync enabled
       const eventId = await addToGoogleCalendar(studentInfo.name, selectedSlot, endTime);
       if (eventId) {
         await updateDoc(doc(db, path, docRef.id), { googleCalendarEventId: eventId });
         setLastBookingEventId(eventId);
+        localStorage.setItem("lastBooking", JSON.stringify({
+          id: docRef.id,
+          eventId,
+          startTime: selectedSlot.toISOString(),
+        }));
       }
 
       // WhatsApp Notification
@@ -745,8 +819,40 @@ function SchedulingApp() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {view === "student" ? (
           <div className="space-y-8">
+            {step === "info" && lastBookingId && (() => {
+              const booking = appointments.find(a => a.id === lastBookingId);
+              if (!booking) return null;
+              return (
+                <div className="max-w-md mx-auto bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-300 mb-1">Sua próxima aula</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200">
+                      {format(booking.startTime, "EEEE, d MMMM")} às {format(booking.startTime, "HH:mm")}
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Cancelar esta aula?")) return;
+                      try {
+                        await deleteDoc(doc(db, "appointments", lastBookingId));
+                        if (lastBookingEventId) await removeFromGoogleCalendar(lastBookingEventId);
+                        toast.success("Aula cancelada");
+                        setLastBookingId(null);
+                        setLastBookingEventId(null);
+                        localStorage.removeItem("lastBooking");
+                      } catch {
+                        toast.error("Não foi possível cancelar");
+                      }
+                    }}
+                    className="text-sm font-bold text-red-500 dark:text-red-400 hover:underline whitespace-nowrap"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              );
+            })()}
             {step === "info" && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white dark:bg-slate-800 dark:border dark:border-slate-700 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/30 p-8 md:p-12 max-w-md mx-auto text-center"
@@ -934,6 +1040,7 @@ function SchedulingApp() {
                     setSelectedSlot(null);
                     setLastBookingId(null);
                     setLastBookingEventId(null);
+                    localStorage.removeItem("lastBooking");
                   }}
                   className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors mb-2"
                 >
@@ -951,6 +1058,7 @@ function SchedulingApp() {
                         toast.success("Aula cancelada");
                         setLastBookingId(null);
                         setLastBookingEventId(null);
+                        localStorage.removeItem("lastBooking");
                         setSelectedSlot(null);
                         setStep("info");
                       } catch (e) {
@@ -1040,8 +1148,8 @@ function SchedulingApp() {
                           {dayAppointments.length > 0 ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                               {dayAppointments.map((app) => {
-                                const style = tagStyles[app.tag || "default"];
-                                const tagLabel = app.tag ? app.tag.replace("-", " ") : "normal";
+                                const style = cardStyleFor(app);
+                                const { classType, outcome } = resolveAppointment(app);
                                 return (
                                   <div
                                     key={app.id}
@@ -1064,7 +1172,10 @@ function SchedulingApp() {
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
-                                    <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{tagLabel}</div>
+                                    <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{classType}</div>
+                                    {outcome && (
+                                      <div className="text-[9px] font-bold uppercase tracking-wider opacity-70">{outcome.replace("-", " ")}</div>
+                                    )}
                                     <button
                                       onClick={() => removeAppointment(app.id)}
                                       className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1196,12 +1307,11 @@ function SchedulingApp() {
                   return (
                     <div className="space-y-2">
                       {monthAppointments.map(app => {
-                        const tagColors: Record<string, string> = {
-                          trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
-                          "no-show": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
-                          complete: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",
-                        };
-                        const bgClass = app.tag ? tagColors[app.tag] : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700";
+                        const { classType, outcome } = resolveAppointment(app);
+                        const bgClass = outcome === "complete" ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                          : outcome === "no-show" ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                          : classType === "trial" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                          : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700";
                         return (
                         <div
                           key={app.id}
@@ -1231,8 +1341,9 @@ function SchedulingApp() {
                               <div className="text-xs text-slate-500 dark:text-slate-400">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
                             </div>
                           </div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {app.tag ? app.tag.replace("-", " ") : "normal"}
+                          <div className="flex flex-col items-end text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            <span>{classType}</span>
+                            {outcome && <span>{outcome.replace("-", " ")}</span>}
                           </div>
                         </div>
                         );
@@ -1338,21 +1449,30 @@ function SchedulingApp() {
       {/* Appointment Context Menu */}
       {contextMenu && (
         <div
-          style={{ top: contextMenu.y, left: contextMenu.x }}
+          style={{
+            top: Math.min(contextMenu.y, window.innerHeight - 340),
+            left: Math.min(contextMenu.x, window.innerWidth - 200),
+          }}
           onClick={(e) => e.stopPropagation()}
           className="fixed z-[100] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[180px]"
         >
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "trial")} className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-950 flex items-center gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-4 pt-1 pb-0.5">Class type</div>
+          <button onClick={() => setClassType(contextMenu.appointmentId, "trial")} className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400" /> Trial (30 min)
           </button>
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, null)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950 flex items-center gap-2">
+          <button onClick={() => setClassType(contextMenu.appointmentId, "normal")} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500" /> Normal (50 min)
           </button>
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "complete")} className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 dark:hover:bg-green-950 flex items-center gap-2">
+          <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-4 pt-1 pb-0.5">Outcome</div>
+          <button onClick={() => setOutcome(contextMenu.appointmentId, "complete")} className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 dark:hover:bg-green-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500" /> Complete
           </button>
-          <button onClick={() => setAppointmentTag(contextMenu.appointmentId, "no-show")} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2">
+          <button onClick={() => setOutcome(contextMenu.appointmentId, "no-show")} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500" /> No-show
+          </button>
+          <button onClick={() => setOutcome(contextMenu.appointmentId, null)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-slate-500 dark:text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-slate-400" /> Clear outcome
           </button>
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
           {(() => {
