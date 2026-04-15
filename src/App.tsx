@@ -52,11 +52,9 @@ import {
   getDocFromServer
 } from "firebase/firestore";
 import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged, 
-  signOut,
-  User as FirebaseUser
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
 } from "firebase/auth";
 import { db, auth, OperationType, handleFirestoreError } from "./firebase";
 import { TimeSlot, Availability, Appointment, AdminSettings, AppointmentTag } from "./types";
@@ -185,14 +183,19 @@ function SchedulingApp() {
     return { day: target.getUTCDay(), hour: target.getUTCHours() };
   };
 
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    const ts = localStorage.getItem("adminSessionTs");
-    return ts ? Date.now() - Number(ts) < 7 * 24 * 60 * 60 * 1000 : false;
-  });
-  const [view, setView] = useState<"student" | "admin">(() => {
-    const ts = localStorage.getItem("adminSessionTs");
-    return ts && Date.now() - Number(ts) < 7 * 24 * 60 * 60 * 1000 ? "admin" : "student";
-  });
+  const ADMIN_EMAIL = "lucaspinheirofab@gmail.com";
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [view, setView] = useState<"student" | "admin">("student");
+
+  // Subscribe to Firebase Auth state - persists across refreshes automatically
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      const loggedIn = !!user && user.email === ADMIN_EMAIL;
+      setIsAdminLoggedIn(loggedIn);
+      if (loggedIn) setView("admin");
+    });
+    return unsub;
+  }, []);
   const [adminTab, setAdminTab] = useState<"schedule" | "availability" | "history" | "settings">("schedule");
   const [historyMonth, setHistoryMonth] = useState<number>(new Date().getMonth());
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
@@ -432,6 +435,25 @@ function SchedulingApp() {
     }
   });
 
+  // Sync lastBooking across tabs
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== "lastBooking") return;
+      if (!e.newValue) {
+        setLastBookingId(null);
+        setLastBookingEventId(null);
+        return;
+      }
+      try {
+        const data = JSON.parse(e.newValue);
+        setLastBookingId(data.id || null);
+        setLastBookingEventId(data.eventId || null);
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   useEffect(() => {
     const testConnection = async () => {
       try {
@@ -615,6 +637,7 @@ function SchedulingApp() {
     if (!token) {
       setAdminSettings(prev => ({ ...prev, googleCalendarConnected: false }));
       setDoc(doc(db, "settings", "admin"), { googleCalendarConnected: false }, { merge: true }).catch(() => {});
+      toast.error("Google Calendar token expired - event not removed from calendar. Reconnect in Settings.");
       return;
     }
     try {
@@ -665,22 +688,25 @@ function SchedulingApp() {
     }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginEmail === "lucaspinheirofab@gmail.com" && loginPassword === "AirbusA320#") {
-      setIsAdminLoggedIn(true);
-      setView("admin");
+    if (loginEmail !== ADMIN_EMAIL) {
+      setLoginError("Invalid email or password");
+      return;
+    }
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       setShowLoginModal(false);
-      localStorage.setItem("adminSessionTs", String(Date.now()));
-    } else {
+    } catch {
       setLoginError("Invalid email or password");
     }
   };
 
-  const handleLogout = () => {
-    setIsAdminLoggedIn(false);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch {}
     setView("student");
-    localStorage.removeItem("adminSessionTs");
   };
 
   const weekDays = useMemo(() => {
