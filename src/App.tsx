@@ -19,7 +19,8 @@ import {
   LogOut,
   AlertCircle,
   Moon,
-  Sun
+  Sun,
+  MoreVertical
 } from "lucide-react";
 import {
   format,
@@ -973,8 +974,18 @@ function SchedulingApp() {
                                       e.preventDefault();
                                       setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
                                     }}
-                                    className={`p-3 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
+                                    className={`p-3 pr-8 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
                                   >
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
+                                      }}
+                                      className="absolute top-1.5 right-1.5 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                                      aria-label="Actions"
+                                    >
+                                      <MoreVertical className="w-4 h-4 opacity-60" />
+                                    </button>
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")}</div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
@@ -1123,8 +1134,18 @@ function SchedulingApp() {
                             e.preventDefault();
                             setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
                           }}
-                          className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-context-menu ${bgClass}`}
+                          className={`p-4 pr-10 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-context-menu relative ${bgClass}`}
                         >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setContextMenu({ x: e.clientX, y: e.clientY, appointmentId: app.id });
+                            }}
+                            className="absolute top-2 right-2 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                            aria-label="Actions"
+                          >
+                            <MoreVertical className="w-4 h-4 opacity-60" />
+                          </button>
                           <div className="flex items-center gap-4">
                             <div className="text-center min-w-[60px]">
                               <div className="text-[10px] font-bold text-slate-400 uppercase">{format(app.startTime, "EEE")}</div>
@@ -1132,10 +1153,10 @@ function SchedulingApp() {
                             </div>
                             <div>
                               <div className="font-bold text-slate-900 dark:text-slate-100">{app.studentName}</div>
-                              <div className="text-xs text-slate-500">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
                             </div>
                           </div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             {app.tag ? app.tag.replace("-", " ") : "normal"}
                           </div>
                         </div>
