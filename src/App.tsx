@@ -163,6 +163,17 @@ const BookLogo = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
 
 function SchedulingApp() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
+  const [lang, setLang] = useState<"en" | "pt" | null>(() => {
+    const saved = localStorage.getItem("lang");
+    return saved === "en" || saved === "pt" ? saved : null;
+  });
+
+  const t = (en: string, pt: string) => (lang === "pt" ? pt : en);
+
+  const pickLang = (l: "en" | "pt") => {
+    localStorage.setItem("lang", l);
+    setLang(l);
+  };
 
   useEffect(() => {
     const root = document.documentElement;
@@ -800,6 +811,41 @@ function SchedulingApp() {
       const waUrl = `https://wa.me/5592981432135?text=${encodeURIComponent(message)}`;
       window.open(waUrl, "_blank");
 
+      // For non-trial classes, ask if they want to schedule the same time for the next 4 weeks
+      if (classType === "normal") {
+        const promptMsg = t(
+          "Would you like to schedule this same time for the next 4 weeks too?",
+          "Quer agendar este mesmo horário para as próximas 4 semanas também?"
+        );
+        if (confirm(promptMsg)) {
+          let extraCreated = 0;
+          for (let i = 1; i <= 3; i++) {
+            const extraStart = addDays(selectedSlot, 7 * i);
+            const extraEnd = addDays(endTime, 7 * i);
+            try {
+              const extraDoc = await addDoc(collection(db, path), {
+                studentName: studentInfo.name,
+                studentPhone: studentInfo.phone,
+                startTime: extraStart.toISOString(),
+                endTime: extraEnd.toISOString(),
+                status: "booked",
+                classType,
+                recurring: true,
+                createdAt: serverTimestamp()
+              });
+              const extraEventId = await addToGoogleCalendar(studentInfo.name, extraStart, extraEnd);
+              if (extraEventId) {
+                await updateDoc(doc(db, path, extraDoc.id), { googleCalendarEventId: extraEventId });
+              }
+              extraCreated++;
+            } catch {}
+          }
+          if (extraCreated > 0) {
+            toast.success(t(`${extraCreated} more weekly classes scheduled`, `${extraCreated} aulas semanais agendadas`));
+          }
+        }
+      }
+
       setStep("success");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
@@ -867,6 +913,15 @@ function SchedulingApp() {
           <span className="hidden sm:inline">English with Lucas</span>
         </div>
         <div className="flex items-center gap-4">
+          {lang && (
+            <button
+              onClick={() => pickLang(lang === "en" ? "pt" : "en")}
+              className="text-xs font-bold px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+              title="Change language / Mudar idioma"
+            >
+              {lang === "en" ? "EN" : "PT"}
+            </button>
+          )}
           <button
             onClick={() => setDarkMode(d => !d)}
             className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -937,42 +992,42 @@ function SchedulingApp() {
                 <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
                   <BookLogo size="lg" />
                 </div>
-                <h1 className="text-2xl font-bold mb-2">Welcome!</h1>
-                <p className="text-slate-500 dark:text-slate-400 mb-8">Please enter your details to view available times for your English class.</p>
-                
+                <h1 className="text-2xl font-bold mb-2">{t("Welcome!", "Bem-vindo!")}</h1>
+                <p className="text-slate-500 dark:text-slate-400 mb-8">{t("Please enter your details to view available times for your English class.", "Por favor, preencha seus dados para ver os horários disponíveis da sua aula.")}</p>
+
                 <div className="space-y-4 text-left">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Full Name</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">{t("Full Name", "Nome Completo")}</label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={studentInfo.name}
                         onChange={(e) => setStudentInfo({ ...studentInfo, name: e.target.value })}
-                        placeholder="Your Name"
+                        placeholder={t("Your Name", "Seu nome")}
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">WhatsApp / Phone Number</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">{t("WhatsApp / Phone Number", "WhatsApp / Telefone")}</label>
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="tel" 
+                      <input
+                        type="tel"
                         value={studentInfo.phone}
                         onChange={(e) => setStudentInfo({ ...studentInfo, phone: e.target.value })}
-                        placeholder="Your WhatsApp number"
+                        placeholder={t("Your WhatsApp number", "Seu WhatsApp")}
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       />
                     </div>
                   </div>
-                  <button 
+                  <button
                     disabled={!studentInfo.name || !studentInfo.phone}
                     onClick={() => setStep("schedule")}
                     className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 disabled:opacity-50 disabled:shadow-none transition-all mt-4"
                   >
-                    Continue to Schedule
+                    {t("Continue to Schedule", "Continuar para os horários")}
                   </button>
                 </div>
               </motion.div>
@@ -992,8 +1047,8 @@ function SchedulingApp() {
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <div className="text-center">
-                    <h1 className="text-2xl font-bold">Pick a Time</h1>
-                    <p className="text-[11px] text-slate-400 mt-1">All times shown in your timezone · {tz}</p>
+                    <h1 className="text-2xl font-bold">{t("Pick a Time", "Escolha um Horário")}</h1>
+                    <p className="text-[11px] text-slate-400 mt-1">{t("All times shown in your timezone", "Horários mostrados no seu fuso horário")} · {tz}</p>
                   </div>
                   <div className="w-10" />
                 </div>
@@ -1026,7 +1081,7 @@ function SchedulingApp() {
 
                 <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6">
                   <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6 flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> Available Slots
+                    <Clock className="w-4 h-4" /> {t("Available Slots", "Horários Disponíveis")}
                   </h2>
                   
                   {availableSlots.length > 0 ? (
@@ -1055,7 +1110,7 @@ function SchedulingApp() {
                   ) : (
                     <div className="text-center py-12 text-slate-400 dark:text-slate-500">
                       <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                      <p>No availability for this day.</p>
+                      <p>{t("No availability for this day.", "Sem horários disponíveis neste dia.")}</p>
                     </div>
                   )}
                 </div>
@@ -1075,7 +1130,7 @@ function SchedulingApp() {
                               <Calendar className="w-6 h-6" />
                             </div>
                             <div>
-                              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Confirm Class</div>
+                              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">{t("Confirm Class", "Confirmar Aula")}</div>
                               <div className="font-bold">{format(selectedSlot, "EEEE, MMMM do")} at {format(selectedSlot, "HH:mm")}</div>
                             </div>
                           </div>
@@ -1084,7 +1139,7 @@ function SchedulingApp() {
                             className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
                           >
                             <Check className="w-5 h-5" />
-                            Book Now
+                            {t("Book Now", "Agendar")}
                           </button>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
@@ -1125,11 +1180,11 @@ function SchedulingApp() {
                 <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8">
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
-                <h1 className="text-3xl font-bold mb-4">Booked!</h1>
+                <h1 className="text-3xl font-bold mb-4">{t("Booked!", "Agendado!")}</h1>
                 <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
                   Your English class is scheduled for <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "HH:mm")}</span>.
                 </p>
-                <p className="text-xs text-slate-400 mb-4">Your timezone: {tz}</p>
+                <p className="text-xs text-slate-400 mb-4">{t("Your timezone", "Seu fuso horário")}: {tz}</p>
                 <button
                   onClick={() => {
                     setStep("info");
@@ -1140,7 +1195,7 @@ function SchedulingApp() {
                   }}
                   className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors mb-2"
                 >
-                  Schedule Another
+                  {t("Schedule Another", "Agendar Outra")}
                 </button>
                 {lastBookingId && (
                   <button
@@ -1535,6 +1590,44 @@ function SchedulingApp() {
           </div>
         )}
       </main>
+
+      {/* Language Picker Modal - shown to students until they pick */}
+      <AnimatePresence>
+        {view === "student" && lang === null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-6"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center"
+            >
+              <h2 className="text-xl font-bold mb-2">Choose your language</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Escolha o seu idioma</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => pickLang("en")}
+                  className="py-4 px-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                >
+                  <div className="text-2xl mb-1">🇺🇸</div>
+                  <div className="text-sm font-bold">English</div>
+                </button>
+                <button
+                  onClick={() => pickLang("pt")}
+                  className="py-4 px-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                >
+                  <div className="text-2xl mb-1">🇧🇷</div>
+                  <div className="text-sm font-bold">Português</div>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Appointment Context Menu */}
       {contextMenu && (
