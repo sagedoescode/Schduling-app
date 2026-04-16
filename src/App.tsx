@@ -530,31 +530,41 @@ function SchedulingApp() {
     }
   };
 
-  // Build OAuth URL for full-page redirect
-  const buildOAuthUrl = (promptType: "consent" | "none") => {
+  // OAuth Authorization Code flow with server-side token exchange
+  const buildOAuthUrl = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = window.location.origin;
     const scope = "https://www.googleapis.com/auth/calendar.events";
-    return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=${promptType}&include_granted_scopes=true`;
+    return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
   };
 
-  // Handle OAuth redirect callback: parse #access_token=... from URL
+  // Handle OAuth redirect: parse ?code=... and exchange for tokens
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash.includes("access_token")) return;
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get("access_token");
-    const expiresIn = params.get("expires_in");
-    if (accessToken) {
-      const expiry = Date.now() + (Number(expiresIn) || 3600) * 1000;
-      saveAdminSettings({
-        googleCalendarConnected: true,
-        googleAccessToken: accessToken,
-        googleTokenExpiry: expiry,
-      }, { silent: true });
-      toast.success("Google Calendar connected!");
-    }
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
     window.history.replaceState(null, "", window.location.pathname);
+    (async () => {
+      try {
+        const resp = await fetch("/api/google-auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "exchange", code, redirectUri: window.location.origin }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error);
+        const expiry = Date.now() + (Number(data.expiresIn) || 3600) * 1000;
+        saveAdminSettings({
+          googleCalendarConnected: true,
+          googleAccessToken: data.accessToken,
+          googleRefreshToken: data.refreshToken,
+          googleTokenExpiry: expiry,
+        }, { silent: true });
+        toast.success("Google Calendar connected!");
+      } catch (e: any) {
+        toast.error("Failed to connect Google Calendar: " + (e.message || "unknown error"));
+      }
+    })();
   }, []);
 
   const connectGoogleCalendar = () => {
@@ -562,56 +572,39 @@ function SchedulingApp() {
       toast.error("Google Client ID not configured.");
       return;
     }
-    window.location.href = buildOAuthUrl("consent");
+    window.location.href = buildOAuthUrl();
   };
 
-  // Silent refresh via hidden iframe
-  const silentRefreshToken = (): Promise<string | null> => {
-    return new Promise(resolve => {
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.src = buildOAuthUrl("none");
-      const timeout = setTimeout(() => {
-        document.body.removeChild(iframe);
-        resolve(null);
-      }, 10000);
-      iframe.onload = () => {
-        try {
-          const hash = iframe.contentWindow?.location.hash;
-          if (hash?.includes("access_token")) {
-            const params = new URLSearchParams(hash.substring(1));
-            const token = params.get("access_token");
-            const expiresIn = params.get("expires_in");
-            if (token) {
-              const expiry = Date.now() + (Number(expiresIn) || 3600) * 1000;
-              saveAdminSettings({
-                googleCalendarConnected: true,
-                googleAccessToken: token,
-                googleTokenExpiry: expiry,
-              }, { silent: true });
-              clearTimeout(timeout);
-              document.body.removeChild(iframe);
-              resolve(token);
-              return;
-            }
-          }
-        } catch (e) {
-          // Cross-origin access denied (expected when iframe navigates to google.com)
-        }
-        clearTimeout(timeout);
-        document.body.removeChild(iframe);
-        resolve(null);
-      };
-      document.body.appendChild(iframe);
-    });
+  // Refresh access token using stored refresh token (via server endpoint)
+  const refreshAccessToken = async (refreshToken: string): Promise<string | null> => {
+    try {
+      const resp = await fetch("/api/google-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refresh", refreshToken }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) return null;
+      const expiry = Date.now() + (Number(data.expiresIn) || 3600) * 1000;
+      saveAdminSettings({
+        googleAccessToken: data.accessToken,
+        googleTokenExpiry: expiry,
+      }, { silent: true });
+      return data.accessToken;
+    } catch {
+      return null;
+    }
   };
 
   const getValidAccessToken = async (): Promise<string | null> => {
-    const { googleAccessToken, googleTokenExpiry } = adminSettings;
+    const { googleAccessToken, googleTokenExpiry, googleRefreshToken } = adminSettings;
     if (googleAccessToken && googleTokenExpiry && Date.now() < googleTokenExpiry - 60000) {
       return googleAccessToken;
     }
-    return silentRefreshToken();
+    if (googleRefreshToken) {
+      return refreshAccessToken(googleRefreshToken);
+    }
+    return null;
   };
 
   const addToGoogleCalendar = async (studentName: string, start: Date, end: Date): Promise<string | null> => {
