@@ -38,6 +38,7 @@ import {
   setMinutes,
   addHours
 } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { TZDate } from "@date-fns/tz";
 import { 
   collection, 
@@ -170,6 +171,8 @@ function SchedulingApp() {
   });
 
   const t = (en: string, pt: string) => (lang === "pt" ? pt : en);
+  const dateLocale = lang === "pt" ? { locale: ptBR } : {};
+  const fmt = (date: Date, pattern: string) => format(date, pattern, dateLocale);
 
   const pickLang = (l: "en" | "pt") => {
     localStorage.setItem("lang", l);
@@ -740,7 +743,7 @@ function SchedulingApp() {
     }
     try {
       await sendPasswordResetEmail(auth, loginEmail);
-      toast.success("Password reset email sent! Check your inbox.");
+      toast.success("Password reset email sent! Check your inbox and spam folder.");
     } catch (err: any) {
       const code = err?.code || "";
       if (code === "auth/user-not-found") {
@@ -978,7 +981,7 @@ function SchedulingApp() {
                   <div>
                     <div className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-300 mb-1">Sua próxima aula</div>
                     <div className="text-sm text-slate-700 dark:text-slate-200">
-                      {format(booking.startTime, "EEEE, d MMMM")} às {format(booking.startTime, "HH:mm")}
+                      {fmt(booking.startTime, "EEEE, d MMMM")} às {format(booking.startTime, "HH:mm")}
                     </div>
                   </div>
                   <button
@@ -1087,10 +1090,10 @@ function SchedulingApp() {
                         }`}
                       >
                         <div className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-70">
-                          {format(day, "EEE")}
+                          {fmt(day, "EEE")}
                         </div>
                         <div className="text-xl font-bold">
-                          {format(day, "d")}
+                          {fmt(day, "d")}
                         </div>
                         {isToday && !isSelected && <div className="w-1 h-1 bg-blue-600 rounded-full mx-auto mt-1" />}
                       </button>
@@ -1150,7 +1153,7 @@ function SchedulingApp() {
                             </div>
                             <div>
                               <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">{t("Confirm Class", "Confirmar Aula")}</div>
-                              <div className="font-bold">{format(selectedSlot, "EEEE, MMMM do")} at {format(selectedSlot, "HH:mm")}</div>
+                              <div className="font-bold">{fmt(selectedSlot, "EEEE, d MMMM")} at {format(selectedSlot, "HH:mm")}</div>
                             </div>
                           </div>
                           <button
@@ -1201,7 +1204,7 @@ function SchedulingApp() {
                 </div>
                 <h1 className="text-3xl font-bold mb-4">{t("Booked!", "Agendado!")}</h1>
                 <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                  Your English class is scheduled for <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "EEEE, MMMM do")}</span> at <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "HH:mm")}</span>.
+                  Your English class is scheduled for <span className="font-bold text-slate-900 dark:text-slate-100">{fmt(selectedSlot!, "EEEE, d MMMM")}</span> at <span className="font-bold text-slate-900 dark:text-slate-100">{format(selectedSlot!, "HH:mm")}</span>.
                 </p>
                 <p className="text-xs text-slate-400 mb-4">{t("Your timezone", "Seu fuso horário")}: {tz}</p>
                 <button
@@ -1306,10 +1309,10 @@ function SchedulingApp() {
                       <div key={dayOffset} className={`flex flex-col sm:flex-row gap-3 sm:gap-5 py-4 ${isPastDay ? "opacity-60" : ""}`}>
                         <div className={`flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 sm:w-20 flex-shrink-0 ${isToday ? "" : ""}`}>
                           <div className={`text-xs font-bold uppercase tracking-widest ${isToday ? "text-blue-600" : "text-slate-400"}`}>
-                            {format(date, "EEE")}
+                            {fmt(date, "EEE")}
                           </div>
                           <div className={`text-2xl font-bold leading-none ${isToday ? "text-blue-600" : "text-slate-700"}`}>
-                            {format(date, "dd")}
+                            {fmt(date, "dd")}
                           </div>
                           {isToday && (
                             <div className="text-[9px] font-bold uppercase tracking-widest bg-blue-600 text-white px-2 py-0.5 rounded-full">
@@ -1397,8 +1400,8 @@ function SchedulingApp() {
                   <div /> {/* Hour label column */}
                   {[1, 2, 3, 4, 5, 6, 0].map(day => (
                     <div key={day} className="text-center font-bold text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 pb-2">
-                      {format(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEEEE")}
-                      <span className="hidden sm:inline">{format(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEE").slice(1)}</span>
+                      {fmt(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEEEE")}
+                      <span className="hidden sm:inline">{fmt(addDays(startOfWeek(nowLocal(), { weekStartsOn: 0 }), day), "EEE").slice(1)}</span>
                     </div>
                   ))}
 
@@ -1464,7 +1467,7 @@ function SchedulingApp() {
                             : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-200 dark:hover:border-blue-600"
                         }`}
                       >
-                        {format(new Date(historyYear, m, 1), "MMM")}
+                        {fmt(new Date(historyYear, m, 1), "MMM")}
                         {count > 0 && (
                           <span className={`ml-1 text-[10px] ${isActive ? "text-blue-100" : "text-slate-400"}`}>({count})</span>
                         )}
@@ -1482,7 +1485,7 @@ function SchedulingApp() {
                     return (
                       <div className="text-center py-12 text-slate-400 dark:text-slate-500">
                         <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                        <p className="text-sm">No classes in {format(new Date(historyYear, historyMonth, 1), "MMMM yyyy")}.</p>
+                        <p className="text-sm">No classes in {fmt(new Date(historyYear, historyMonth, 1), "MMMM yyyy")}.</p>
                       </div>
                     );
                   }
@@ -1518,7 +1521,7 @@ function SchedulingApp() {
                           </label>
                           <div className="flex items-center gap-4">
                             <div className="text-center min-w-[60px]">
-                              <div className="text-[10px] font-bold text-slate-400 uppercase">{format(app.startTime, "EEE")}</div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase">{fmt(app.startTime, "EEE")}</div>
                               <div className="text-xl font-bold text-slate-700 dark:text-slate-200">{format(app.startTime, "dd")}</div>
                             </div>
                             <div>
