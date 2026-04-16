@@ -55,6 +55,7 @@ import {
 } from "firebase/firestore";
 import { 
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   onAuthStateChanged,
   signOut,
   setPersistence,
@@ -728,6 +729,24 @@ function SchedulingApp() {
         setLoginError("Email/Password not enabled yet - ask Claude");
       } else {
         setLoginError(code ? `Login failed (${code})` : "Login failed");
+      }
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!loginEmail) {
+      setLoginError("Enter your email first");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, loginEmail);
+      toast.success("Password reset email sent! Check your inbox.");
+    } catch (err: any) {
+      const code = err?.code || "";
+      if (code === "auth/user-not-found") {
+        setLoginError("No account found with that email");
+      } else {
+        toast.error("Failed to send reset email");
       }
     }
   };
@@ -1747,15 +1766,24 @@ function SchedulingApp() {
                     </button>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
-                  />
-                  Remember me
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                    />
+                    Remember me
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 {loginError && (
                   <p className="text-red-500 text-sm font-medium">{loginError}</p>
                 )}
