@@ -1339,18 +1339,22 @@ function SchedulingApp() {
                                     }}
                                     className={`p-3 pr-8 border rounded-xl text-xs group relative cursor-context-menu ${style}`}
                                   >
-                                    <label
-                                      className="absolute top-1.5 right-1.5 flex items-center cursor-pointer p-1"
-                                      onClick={(e) => e.stopPropagation()}
+                                    <button
+                                      className="absolute top-1.5 right-1.5 p-0.5"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAppointmentTag(app.id, outcome === "complete" ? null : "complete");
+                                      }}
                                       title={outcome === "complete" ? "Unmark complete" : "Mark complete"}
                                     >
-                                      <input
-                                        type="checkbox"
-                                        checked={outcome === "complete"}
-                                        onChange={() => setAppointmentTag(app.id, outcome === "complete" ? null : "complete")}
-                                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-500 text-green-600 focus:ring-green-500 cursor-pointer"
-                                      />
-                                    </label>
+                                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                        outcome === "complete"
+                                          ? "bg-green-500 border-green-500 text-white"
+                                          : "border-slate-300 dark:border-slate-600 hover:border-green-400"
+                                      }`}>
+                                        {outcome === "complete" && <Check className="w-3 h-3" />}
+                                      </div>
+                                    </button>
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")} <span className="text-[10px] font-medium opacity-70">({durMin}m)</span></div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
@@ -1507,18 +1511,22 @@ function SchedulingApp() {
                           }}
                           className={`p-4 pr-10 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-context-menu relative ${bgClass}`}
                         >
-                          <label
-                            className="absolute top-2 right-2 flex items-center cursor-pointer p-1"
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            className="absolute top-2 right-2 p-0.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAppointmentTag(app.id, (app.outcome === "complete" || app.tag === "complete") ? null : "complete");
+                            }}
                             title={app.outcome === "complete" || app.tag === "complete" ? "Unmark complete" : "Mark complete"}
                           >
-                            <input
-                              type="checkbox"
-                              checked={app.outcome === "complete" || app.tag === "complete"}
-                              onChange={() => setAppointmentTag(app.id, (app.outcome === "complete" || app.tag === "complete") ? null : "complete")}
-                              className="w-4 h-4 rounded border-slate-300 dark:border-slate-500 text-green-600 focus:ring-green-500 cursor-pointer"
-                            />
-                          </label>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                              (app.outcome === "complete" || app.tag === "complete")
+                                ? "bg-green-500 border-green-500 text-white"
+                                : "border-slate-300 dark:border-slate-600 hover:border-green-400"
+                            }`}>
+                              {(app.outcome === "complete" || app.tag === "complete") && <Check className="w-3 h-3" />}
+                            </div>
+                          </button>
                           <div className="flex items-center gap-4">
                             <div className="text-center min-w-[60px]">
                               <div className="text-[10px] font-bold text-slate-400 uppercase">{fmt(app.startTime, "EEE")}</div>
