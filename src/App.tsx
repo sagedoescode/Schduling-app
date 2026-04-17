@@ -217,6 +217,7 @@ function SchedulingApp() {
   }, []);
   const [adminTab, setAdminTab] = useState<"schedule" | "availability" | "history" | "settings">("schedule");
   const [historyMonth, setHistoryMonth] = useState<number>(new Date().getMonth());
+  const [historySort, setHistorySort] = useState<"name" | "date">("date");
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
 
@@ -325,6 +326,24 @@ function SchedulingApp() {
     if (failed > 0 && deleted > 0) toast.success(`Removed ${deleted}, ${failed} failed`);
     else if (failed > 0) toast.error("Failed to unlock weekly schedule");
     else toast.success(`Unlocked ${deleted} future ${deleted === 1 ? "class" : "classes"} for ${source.studentName}`);
+  };
+
+  const changeAppointmentDuration = async (id: string, minutes: number) => {
+    const app = appointments.find(a => a.id === id);
+    if (!app) { setContextMenu(null); return; }
+    setContextMenu(null);
+    const startTime = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+    const newEnd = addMinutes(startTime, minutes);
+    try {
+      await updateDoc(doc(db, "appointments", id), {
+        endTime: newEnd.toISOString(),
+        classType: minutes === 30 ? "trial" : "normal",
+      });
+      toast.success(`Duration set to ${minutes} min`);
+    } catch (error) {
+      toast.error("Failed to change duration");
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
   };
 
   const lockWeeklySchedule = async (id: string, weeks: number = 4) => {
@@ -756,10 +775,10 @@ function SchedulingApp() {
     const now = nowLocal();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = startOfWeek(now, { weekStartsOn: 1 });
-    // Always show 2 weeks so students can pick from next week too
+    // Show 15 days ahead so students have more scheduling options
     const allDays = eachDayOfInterval({
       start,
-      end: addDays(start, 13)
+      end: addDays(today, 14)
     });
     return allDays.filter(day => day >= today);
   }, [tz]);
@@ -1433,20 +1452,36 @@ function SchedulingApp() {
                     <Calendar className="w-5 h-5 text-blue-600" />
                     History
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setHistoryYear(y => y - 1)}
-                      className="p-2 rounded-lg hover:bg-slate-50 text-slate-500"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="font-bold text-slate-700 w-16 text-center">{historyYear}</span>
-                    <button
-                      onClick={() => setHistoryYear(y => y + 1)}
-                      className="p-2 rounded-lg hover:bg-slate-50 text-slate-500"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
+                      <button
+                        onClick={() => setHistorySort("date")}
+                        className={`px-3 py-1 rounded text-xs font-bold transition-all ${historySort === "date" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400"}`}
+                      >
+                        Date
+                      </button>
+                      <button
+                        onClick={() => setHistorySort("name")}
+                        className={`px-3 py-1 rounded text-xs font-bold transition-all ${historySort === "name" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400"}`}
+                      >
+                        Name
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setHistoryYear(y => y - 1)}
+                        className="p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="font-bold text-slate-700 dark:text-slate-200 w-16 text-center">{historyYear}</span>
+                      <button
+                        onClick={() => setHistoryYear(y => y + 1)}
+                        className="p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1476,7 +1511,9 @@ function SchedulingApp() {
                 {(() => {
                   const monthAppointments = appointments
                     .filter(a => a.startTime.getFullYear() === historyYear && a.startTime.getMonth() === historyMonth)
-                    .sort((a, b) => a.studentName.localeCompare(b.studentName) || b.startTime.getTime() - a.startTime.getTime());
+                    .sort((a, b) => historySort === "name"
+                      ? a.studentName.localeCompare(b.studentName) || b.startTime.getTime() - a.startTime.getTime()
+                      : b.startTime.getTime() - a.startTime.getTime());
 
                   if (monthAppointments.length === 0) {
                     return (
@@ -1683,6 +1720,14 @@ function SchedulingApp() {
           </button>
           <button onClick={() => setOutcome(contextMenu.appointmentId, null)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-slate-500 dark:text-slate-400">
             <span className="w-2 h-2 rounded-full bg-slate-400" /> Clear outcome
+          </button>
+          <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-4 pt-1 pb-0.5">Duration</div>
+          <button onClick={() => changeAppointmentDuration(contextMenu.appointmentId, 30)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+            <Clock className="w-3 h-3 text-slate-500" /> Set to 30 min
+          </button>
+          <button onClick={() => changeAppointmentDuration(contextMenu.appointmentId, 50)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+            <Clock className="w-3 h-3 text-slate-500" /> Set to 50 min
           </button>
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
           {(() => {
