@@ -208,6 +208,8 @@ function SchedulingApp() {
   const [view, setView] = useState<"student" | "admin">("student");
 
   useEffect(() => {
+    // Force local persistence on every mount so session survives browser restarts
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
     const unsub = onAuthStateChanged(auth, (user) => {
       const loggedIn = !!user && user.email === ADMIN_EMAIL;
       setIsAdminLoggedIn(loggedIn);
