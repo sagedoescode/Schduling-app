@@ -163,6 +163,44 @@ const BookLogo = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
   );
 };
 
+const TAG_STYLES: Record<string, string> = {
+  trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
+  "no-show": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300",
+  complete: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300",
+  default: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300",
+};
+
+function resolveAppointment(app: Appointment) {
+  const legacy = app.tag;
+  const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+  const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
+  const durationMin = (end.getTime() - start.getTime()) / 60000;
+  const inferredType: "trial" | "normal" = durationMin > 0 && durationMin < 45 ? "trial" : "normal";
+  const classType: "trial" | "normal" =
+    app.classType ?? (legacy === "trial" ? "trial" : inferredType);
+  const outcome: "complete" | "no-show" | undefined =
+    app.outcome ?? (legacy === "complete" ? "complete" : legacy === "no-show" ? "no-show" : undefined);
+  return { classType, outcome };
+}
+
+function cardStyleFor(app: Appointment) {
+  const { classType, outcome } = resolveAppointment(app);
+  if (outcome === "complete") return TAG_STYLES.complete;
+  if (outcome === "no-show") return TAG_STYLES["no-show"];
+  if (classType === "trial") return TAG_STYLES.trial;
+  return TAG_STYLES.default;
+}
+
+function priceFor(app: Appointment): number {
+  const { classType, outcome } = resolveAppointment(app);
+  if (outcome !== "complete") return 0;
+  if (classType === "trial") return 10;
+  const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+  const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
+  const duration = (end.getTime() - start.getTime()) / 60000;
+  return duration < 45 ? 19 : 35;
+}
+
 function SchedulingApp() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
   const [lang, setLang] = useState<"en" | "pt" | null>(() => {
@@ -224,35 +262,7 @@ function SchedulingApp() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{ appointmentId: string; selectedDay: Date | null; selectedTime: Date | null } | null>(null);
 
-  const tagStyles: Record<string, string> = {
-    trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
-    "no-show": "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300",
-    complete: "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300",
-    default: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300",
-  };
-
-  // Resolve class type + outcome handling legacy tag field.
-  function resolveAppointment(app: Appointment) {
-    const legacy = app.tag;
-    const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
-    const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
-    const durationMin = (end.getTime() - start.getTime()) / 60000;
-    const inferredType: "trial" | "normal" = durationMin > 0 && durationMin < 45 ? "trial" : "normal";
-
-    const classType: "trial" | "normal" =
-      app.classType ?? (legacy === "trial" ? "trial" : inferredType);
-    const outcome: "complete" | "no-show" | undefined =
-      app.outcome ?? (legacy === "complete" ? "complete" : legacy === "no-show" ? "no-show" : undefined);
-    return { classType, outcome };
-  }
-
-  function cardStyleFor(app: Appointment) {
-    const { classType, outcome } = resolveAppointment(app);
-    if (outcome === "complete") return tagStyles.complete;
-    if (outcome === "no-show") return tagStyles["no-show"];
-    if (classType === "trial") return tagStyles.trial;
-    return tagStyles.default;
-  }
+  const tagStyles = TAG_STYLES;
 
   const setAppointmentTag = async (id: string, tag: AppointmentTag | null) => {
     try {
@@ -370,11 +380,6 @@ function SchedulingApp() {
     }
   };
 
-  const rescheduleSlots = useMemo(() => {
-    if (!rescheduleModal?.selectedDay) return [];
-    return generateTimeSlots(rescheduleModal.selectedDay);
-  }, [rescheduleModal?.selectedDay, availability, tz]);
-
   const lockWeeklySchedule = async (id: string, weeks: number = 4) => {
     const source = appointments.find(a => a.id === id);
     if (!source) {
@@ -445,15 +450,6 @@ function SchedulingApp() {
   const [selectedClassKind, setSelectedClassKind] = useState<"trial" | "normal30" | "normal50">("normal50");
 
   // Pricing (BRL)
-  function priceFor(app: Appointment): number {
-    const { classType, outcome } = resolveAppointment(app);
-    if (outcome !== "complete") return 0;
-    if (classType === "trial") return 10;
-    const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
-    const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
-    const duration = (end.getTime() - start.getTime()) / 60000;
-    return duration < 45 ? 19 : 35;
-  }
 
   const weeklyEarnings = useMemo(() => {
     const now = new Date();
@@ -830,6 +826,11 @@ function SchedulingApp() {
   };
 
   const availableSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate, availability, tz]);
+
+  const rescheduleSlots = useMemo(() => {
+    if (!rescheduleModal?.selectedDay) return [];
+    return generateTimeSlots(rescheduleModal.selectedDay);
+  }, [rescheduleModal?.selectedDay, availability, tz]);
 
   const studentBookings = useMemo(() => {
     if (!studentInfo.phone || studentInfo.phone.length < 6) return [];
