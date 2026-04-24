@@ -28,8 +28,14 @@ import {
   format,
   addDays,
   startOfWeek,
+  endOfWeek,
   eachDayOfInterval,
   isSameDay,
+  isSameMonth,
+  startOfMonth,
+  endOfMonth,
+  addMonths,
+  subMonths,
   addMinutes,
   isPast,
   isBefore,
@@ -261,6 +267,7 @@ function SchedulingApp() {
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{ appointmentId: string; selectedDay: Date | null; selectedTime: Date | null } | null>(null);
+  const [rescheduleMonth, setRescheduleMonth] = useState<Date>(() => startOfMonth(new Date()));
 
   const tagStyles = TAG_STYLES;
 
@@ -829,8 +836,14 @@ function SchedulingApp() {
 
   const rescheduleSlots = useMemo(() => {
     if (!rescheduleModal?.selectedDay) return [];
-    return generateTimeSlots(rescheduleModal.selectedDay);
-  }, [rescheduleModal?.selectedDay, availability, tz]);
+    const d = rescheduleModal.selectedDay;
+    const tzDate = toLocal(d);
+    const slots: Date[] = [];
+    for (let h = 7; h <= 22; h++) {
+      slots.push(setMinutes(setHours(tzDate, h), 0));
+    }
+    return slots;
+  }, [rescheduleModal?.selectedDay, tz]);
 
   const studentBookings = useMemo(() => {
     if (!studentInfo.phone || studentInfo.phone.length < 6) return [];
@@ -1870,22 +1883,52 @@ function SchedulingApp() {
                       {app.studentName} · {t("currently", "atualmente")} {fmt(app.startTime, "EEE d MMM")} {format(app.startTime, "HH:mm")}
                     </div>
                     <div>
-                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">{t("Pick new day", "Escolha novo dia")}</div>
-                      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                        {weekDays.map((day, i) => {
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{t("Pick new day", "Escolha novo dia")}</div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => setRescheduleMonth(m => subMonths(m, 1))} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <div className="text-sm font-bold min-w-[110px] text-center capitalize">{fmt(rescheduleMonth, "MMMM yyyy")}</div>
+                          <button onClick={() => setRescheduleMonth(m => addMonths(m, 1))} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-7 gap-1 mb-1">
+                        {eachDayOfInterval({ start: startOfWeek(rescheduleMonth, { weekStartsOn: 1 }), end: addDays(startOfWeek(rescheduleMonth, { weekStartsOn: 1 }), 6) }).map((d, i) => (
+                          <div key={i} className="text-[10px] font-bold uppercase text-center text-slate-400 dark:text-slate-500 py-1">{fmt(d, "EEEEEE")}</div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {eachDayOfInterval({
+                          start: startOfWeek(startOfMonth(rescheduleMonth), { weekStartsOn: 1 }),
+                          end: endOfWeek(endOfMonth(rescheduleMonth), { weekStartsOn: 1 })
+                        }).map((day, i) => {
                           const isSelected = rescheduleModal.selectedDay && isSameDay(day, rescheduleModal.selectedDay);
+                          const inMonth = isSameMonth(day, rescheduleMonth);
+                          const isToday = isSameDay(day, new Date());
                           return (
                             <button
                               key={i}
-                              onClick={() => setRescheduleModal(m => m ? { ...m, selectedDay: day, selectedTime: null } : null)}
-                              className={`flex-shrink-0 w-16 py-3 rounded-xl border text-center transition-all ${
+                              onClick={() => setRescheduleModal(m => {
+                                if (!m) return null;
+                                const app = appointments.find(a => a.id === m.appointmentId);
+                                const origHour = app ? (app.startTime instanceof Date ? app.startTime : new Date(app.startTime)).getHours() : null;
+                                const suggestedTime = origHour !== null ? setMinutes(setHours(toLocal(day), origHour), 0) : null;
+                                return { ...m, selectedDay: day, selectedTime: suggestedTime };
+                              })}
+                              className={`aspect-square rounded-lg text-sm font-bold transition-all ${
                                 isSelected
-                                  ? "bg-blue-600 border-blue-600 text-white"
-                                  : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                                  ? "bg-blue-600 text-white"
+                                  : isToday
+                                  ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60"
+                                  : inMonth
+                                  ? "hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+                                  : "text-slate-300 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
                               }`}
                             >
-                              <div className="text-[10px] font-bold uppercase">{fmt(day, "EEE")}</div>
-                              <div className="text-sm font-bold">{format(day, "d")}</div>
+                              {format(day, "d")}
                             </button>
                           );
                         })}
