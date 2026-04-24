@@ -231,7 +231,21 @@ function SchedulingApp() {
     default: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300",
   };
 
-  // Outcome wins over classType for card color (complete/no-show override trial/normal visual)
+  // Resolve class type + outcome handling legacy tag field.
+  const resolveAppointment = (app: Appointment) => {
+    const legacy = app.tag;
+    const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+    const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
+    const durationMin = (end.getTime() - start.getTime()) / 60000;
+    const inferredType: "trial" | "normal" = durationMin > 0 && durationMin < 45 ? "trial" : "normal";
+
+    const classType: "trial" | "normal" =
+      app.classType ?? (legacy === "trial" ? "trial" : inferredType);
+    const outcome: "complete" | "no-show" | undefined =
+      app.outcome ?? (legacy === "complete" ? "complete" : legacy === "no-show" ? "no-show" : undefined);
+    return { classType, outcome };
+  };
+
   const cardStyleFor = (app: Appointment) => {
     const { classType, outcome } = resolveAppointment(app);
     if (outcome === "complete") return tagStyles.complete;
@@ -241,9 +255,6 @@ function SchedulingApp() {
   };
 
   const setAppointmentTag = async (id: string, tag: AppointmentTag | null) => {
-    // Legacy helper kept for any existing callers. New UI uses
-    // setClassType / setOutcome below so class type (trial/normal) and
-    // outcome (complete/no-show) can coexist on the same card.
     try {
       await updateDoc(doc(db, "appointments", id), { tag: tag ?? null });
       toast.success(tag ? `Marked as ${tag}` : "Tag cleared");
@@ -274,23 +285,6 @@ function SchedulingApp() {
       handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
     }
     setContextMenu(null);
-  };
-
-  // Resolve class type + outcome handling legacy tag field.
-  // For legacy data where tag was overwritten (e.g., trial->complete lost trial),
-  // fall back to inferring class type from the actual class duration.
-  const resolveAppointment = (app: Appointment) => {
-    const legacy = app.tag;
-    const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
-    const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
-    const durationMin = (end.getTime() - start.getTime()) / 60000;
-    const inferredType: "trial" | "normal" = durationMin > 0 && durationMin < 45 ? "trial" : "normal";
-
-    const classType: "trial" | "normal" =
-      app.classType ?? (legacy === "trial" ? "trial" : inferredType);
-    const outcome: "complete" | "no-show" | undefined =
-      app.outcome ?? (legacy === "complete" ? "complete" : legacy === "no-show" ? "no-show" : undefined);
-    return { classType, outcome };
   };
 
   const unlockWeeklySchedule = async (id: string) => {
