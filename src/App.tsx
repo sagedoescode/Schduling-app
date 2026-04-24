@@ -232,7 +232,7 @@ function SchedulingApp() {
   };
 
   // Resolve class type + outcome handling legacy tag field.
-  const resolveAppointment = (app: Appointment) => {
+  function resolveAppointment(app: Appointment) {
     const legacy = app.tag;
     const start = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
     const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
@@ -244,15 +244,15 @@ function SchedulingApp() {
     const outcome: "complete" | "no-show" | undefined =
       app.outcome ?? (legacy === "complete" ? "complete" : legacy === "no-show" ? "no-show" : undefined);
     return { classType, outcome };
-  };
+  }
 
-  const cardStyleFor = (app: Appointment) => {
+  function cardStyleFor(app: Appointment) {
     const { classType, outcome } = resolveAppointment(app);
     if (outcome === "complete") return tagStyles.complete;
     if (outcome === "no-show") return tagStyles["no-show"];
     if (classType === "trial") return tagStyles.trial;
     return tagStyles.default;
-  };
+  }
 
   const setAppointmentTag = async (id: string, tag: AppointmentTag | null) => {
     try {
@@ -445,7 +445,7 @@ function SchedulingApp() {
   const [selectedClassKind, setSelectedClassKind] = useState<"trial" | "normal30" | "normal50">("normal50");
 
   // Pricing (BRL)
-  const priceFor = (app: Appointment): number => {
+  function priceFor(app: Appointment): number {
     const { classType, outcome } = resolveAppointment(app);
     if (outcome !== "complete") return 0;
     if (classType === "trial") return 10;
@@ -453,7 +453,7 @@ function SchedulingApp() {
     const end = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
     const duration = (end.getTime() - start.getTime()) / 60000;
     return duration < 45 ? 19 : 35;
-  };
+  }
 
   const weeklyEarnings = useMemo(() => {
     const now = new Date();
