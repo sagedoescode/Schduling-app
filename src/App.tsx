@@ -222,6 +222,7 @@ function SchedulingApp() {
   const [historySort, setHistorySort] = useState<"name" | "date">("date");
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
+  const [rescheduleModal, setRescheduleModal] = useState<{ appointmentId: string; selectedDay: Date | null; selectedTime: Date | null } | null>(null);
 
   const tagStyles: Record<string, string> = {
     trial: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
@@ -347,6 +348,38 @@ function SchedulingApp() {
       handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
     }
   };
+
+  const rescheduleAppointment = async (id: string, newStart: Date) => {
+    const app = appointments.find(a => a.id === id);
+    if (!app) return;
+    const oldStart = app.startTime instanceof Date ? app.startTime : new Date(app.startTime);
+    const oldEnd = app.endTime instanceof Date ? app.endTime : new Date(app.endTime);
+    const durationMs = oldEnd.getTime() - oldStart.getTime();
+    const newEnd = new Date(newStart.getTime() + durationMs);
+    try {
+      await updateDoc(doc(db, "appointments", id), {
+        startTime: newStart.toISOString(),
+        endTime: newEnd.toISOString(),
+      });
+      if (app.googleCalendarEventId) {
+        await removeFromGoogleCalendar(app.googleCalendarEventId);
+        const eventId = await addToGoogleCalendar(app.studentName, newStart, newEnd);
+        if (eventId) {
+          await updateDoc(doc(db, "appointments", id), { googleCalendarEventId: eventId });
+        }
+      }
+      toast.success(`Rescheduled ${app.studentName} to ${fmt(newStart, "EEE d MMM")} at ${format(newStart, "HH:mm")}`);
+      setRescheduleModal(null);
+    } catch (error) {
+      toast.error("Failed to reschedule");
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
+  };
+
+  const rescheduleSlots = useMemo(() => {
+    if (!rescheduleModal?.selectedDay) return [];
+    return generateTimeSlots(rescheduleModal.selectedDay);
+  }, [rescheduleModal?.selectedDay, availability, tz]);
 
   const lockWeeklySchedule = async (id: string, weeks: number = 4) => {
     const source = appointments.find(a => a.id === id);
@@ -804,6 +837,14 @@ function SchedulingApp() {
 
   const availableSlots = useMemo(() => generateTimeSlots(selectedDate), [selectedDate, availability, tz]);
 
+  const studentBookings = useMemo(() => {
+    if (!studentInfo.phone || studentInfo.phone.length < 6) return [];
+    const phone = studentInfo.phone.replace(/\D/g, "");
+    return appointments
+      .filter(a => a.studentPhone?.replace(/\D/g, "").includes(phone) && a.status === "booked" && a.startTime >= new Date())
+      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  }, [studentInfo.phone, appointments]);
+
   const handleSchedule = async () => {
     if (!selectedSlot || !studentInfo.name || !studentInfo.phone) return;
 
@@ -1089,6 +1130,25 @@ function SchedulingApp() {
                   <div className="w-10" />
                 </div>
 
+                {studentBookings.length > 0 && (
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+                      {t("Your Upcoming Classes", "Suas Próximas Aulas")} ({studentBookings.length})
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {studentBookings.slice(0, 5).map(b => (
+                        <div key={b.id} className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl text-sm">
+                          <div>
+                            <span className="font-bold">{fmt(b.startTime, "EEE, d MMM")}</span>
+                            <span className="text-slate-500 dark:text-slate-400 ml-2">{format(b.startTime, "HH:mm")}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">{tz.split("/").pop()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                   {weekDays.map((day, i) => {
                     const isSelected = isSameDay(day, selectedDate);
@@ -1266,6 +1326,23 @@ function SchedulingApp() {
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-700 dark:text-slate-200">Admin Dashboard</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Manage your availability and view upcoming classes.</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <select
+                    value={tz}
+                    onChange={(e) => setTz(e.target.value)}
+                    className="text-[11px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300 cursor-pointer"
+                  >
+                    {[
+                      Intl.DateTimeFormat().resolvedOptions().timeZone,
+                      "America/Sao_Paulo", "America/Manaus", "America/Cuiaba",
+                      "America/Fortaleza", "America/Belem", "America/Recife",
+                      "America/New_York", "America/Chicago", "America/Denver",
+                      "America/Los_Angeles", "Europe/London", "Europe/Lisbon",
+                    ].filter((v, i, a) => a.indexOf(v) === i).map(zone => (
+                      <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>
+                    ))}
+                  </select>
+                </div>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   This week: <span className="font-bold text-green-600 dark:text-green-400">R$ {weeklyEarnings.toFixed(2)}</span>
                   <span className="opacity-60"> · {weeklyHours.toFixed(1)}h scheduled</span>
@@ -1732,6 +1809,13 @@ function SchedulingApp() {
             <Clock className="w-3 h-3 text-slate-500" /> Set to 50 min
           </button>
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+          <button onClick={() => {
+            setRescheduleModal({ appointmentId: contextMenu.appointmentId, selectedDay: null, selectedTime: null });
+            setContextMenu(null);
+          }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+            <Calendar className="w-3 h-3 text-blue-500" /> Reschedule
+          </button>
+          <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
           {(() => {
             const app = appointments.find(a => a.id === contextMenu.appointmentId);
             const isRecurring = !!app?.recurring;
@@ -1758,6 +1842,103 @@ function SchedulingApp() {
           </button>
         </div>
       )}
+
+      {/* Reschedule Modal */}
+      <AnimatePresence>
+        {rescheduleModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+            onClick={() => setRescheduleModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Reschedule</h2>
+                <button onClick={() => setRescheduleModal(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {(() => {
+                const app = appointments.find(a => a.id === rescheduleModal.appointmentId);
+                if (!app) return null;
+                return (
+                  <div className="space-y-4">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {app.studentName} · {t("currently", "atualmente")} {fmt(app.startTime, "EEE d MMM")} {format(app.startTime, "HH:mm")}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">{t("Pick new day", "Escolha novo dia")}</div>
+                      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                        {weekDays.map((day, i) => {
+                          const isSelected = rescheduleModal.selectedDay && isSameDay(day, rescheduleModal.selectedDay);
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => setRescheduleModal(m => m ? { ...m, selectedDay: day, selectedTime: null } : null)}
+                              className={`flex-shrink-0 w-16 py-3 rounded-xl border text-center transition-all ${
+                                isSelected
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                              }`}
+                            >
+                              <div className="text-[10px] font-bold uppercase">{fmt(day, "EEE")}</div>
+                              <div className="text-sm font-bold">{format(day, "d")}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {rescheduleModal.selectedDay && (
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">{t("Pick new time", "Escolha novo horário")}</div>
+                        {rescheduleSlots.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            {rescheduleSlots.map((slot, i) => {
+                              const isSelected = rescheduleModal.selectedTime?.getTime() === slot.getTime();
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={() => setRescheduleModal(m => m ? { ...m, selectedTime: slot } : null)}
+                                  className={`py-2 rounded-xl border text-sm font-bold transition-all ${
+                                    isSelected
+                                      ? "bg-blue-600 border-blue-600 text-white"
+                                      : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                                  }`}
+                                >
+                                  {format(slot, "HH:mm")}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-400 dark:text-slate-500 italic py-4 text-center">{t("No available slots this day", "Sem horários disponíveis neste dia")}</p>
+                        )}
+                      </div>
+                    )}
+                    {rescheduleModal.selectedTime && (
+                      <button
+                        onClick={() => rescheduleAppointment(rescheduleModal.appointmentId, rescheduleModal.selectedTime!)}
+                        className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Check className="w-5 h-5" />
+                        {t("Confirm Reschedule", "Confirmar Reagendamento")}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Admin Login Modal */}
       <AnimatePresence>
