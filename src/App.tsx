@@ -1478,6 +1478,18 @@ function SchedulingApp() {
                                         {outcome === "complete" && <Check className="w-3 h-3" />}
                                       </div>
                                     </button>
+                                    <button
+                                      className="absolute bottom-1.5 right-1.5 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 active:bg-black/10 dark:active:bg-white/20 text-slate-500 dark:text-slate-300"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                        setContextMenu({ x: rect.right, y: rect.bottom, appointmentId: app.id });
+                                      }}
+                                      title="More actions"
+                                      aria-label="More actions"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </button>
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")} <span className="text-[10px] font-medium opacity-70">({durMin}m)</span></div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
@@ -1489,12 +1501,6 @@ function SchedulingApp() {
                                     ) : (
                                       <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{classType}</div>
                                     )}
-                                    <button
-                                      onClick={() => removeAppointment(app.id)}
-                                      className="mt-2 text-red-500 hover:text-red-700 font-bold text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      Cancel
-                                    </button>
                                   </div>
                                 );
                               })}
@@ -1667,6 +1673,18 @@ function SchedulingApp() {
                             }`}>
                               {(app.outcome === "complete" || app.tag === "complete") && <Check className="w-3 h-3" />}
                             </div>
+                          </button>
+                          <button
+                            className="absolute bottom-2 right-2 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 active:bg-black/10 dark:active:bg-white/20 text-slate-500 dark:text-slate-300"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setContextMenu({ x: rect.right, y: rect.bottom, appointmentId: app.id });
+                            }}
+                            title="More actions"
+                            aria-label="More actions"
+                          >
+                            <MoreVertical className="w-4 h-4" />
                           </button>
                           <div className="flex items-center gap-4">
                             <div className="text-center min-w-[60px]">
