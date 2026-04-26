@@ -38,22 +38,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === "refresh" && refreshToken) {
     // Use refresh token to get a new access token
-    const resp = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        refresh_token: refreshToken,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: "refresh_token",
-      }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) return res.status(400).json({ error: data.error_description || data.error });
-    return res.json({
-      accessToken: data.access_token,
-      expiresIn: data.expires_in,
-    });
+    try {
+      const resp = await fetch(TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          refresh_token: refreshToken,
+          client_id: CLIENT_ID,
+          client_secret: CLIENT_SECRET,
+          grant_type: "refresh_token",
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        // Surface Google's error code so the client can distinguish a genuinely
+        // revoked refresh token (invalid_grant) from transient/server errors.
+        return res.status(resp.status).json({
+          error: data.error_description || data.error || "refresh_failed",
+          errorCode: data.error || "unknown",
+        });
+      }
+      return res.json({
+        accessToken: data.access_token,
+        expiresIn: data.expires_in,
+      });
+    } catch (e: any) {
+      // Network failure between our function and Google: transient, not a revocation.
+      return res.status(503).json({ error: e?.message || "network_error", errorCode: "network_error" });
+    }
   }
 
   return res.status(400).json({ error: "Invalid action. Use 'exchange' or 'refresh'." });

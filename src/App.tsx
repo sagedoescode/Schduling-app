@@ -626,49 +626,69 @@ function SchedulingApp() {
     window.location.href = buildOAuthUrl();
   };
 
-  // Refresh access token using stored refresh token (via server endpoint)
-  const refreshAccessToken = async (refreshToken: string): Promise<string | null> => {
+  // Refresh access token using stored refresh token (via server endpoint).
+  // Returns { token } on success, { revoked: true } only when Google reports the
+  // refresh token is genuinely dead (invalid_grant). Transient failures return
+  // { transient: true } so callers can keep the connection alive.
+  type RefreshResult = { token: string } | { revoked: true } | { transient: true };
+  const refreshAccessToken = async (refreshToken: string): Promise<RefreshResult> => {
     try {
       const resp = await fetch("/api/google-auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "refresh", refreshToken }),
       });
-      const data = await resp.json();
-      if (!resp.ok) return null;
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        // Only treat invalid_grant (refresh token revoked / expired by Google)
+        // as a real disconnection. Everything else (5xx, network errors, rate
+        // limits) is transient and should not wipe the user's connection.
+        if (data?.errorCode === "invalid_grant") return { revoked: true };
+        return { transient: true };
+      }
       const expiry = Date.now() + (Number(data.expiresIn) || 3600) * 1000;
       saveAdminSettings({
         googleAccessToken: data.accessToken,
         googleTokenExpiry: expiry,
       }, { silent: true });
-      return data.accessToken;
+      return { token: data.accessToken };
     } catch {
-      return null;
+      return { transient: true };
     }
   };
 
-  const getValidAccessToken = async (): Promise<string | null> => {
+  type TokenResult = { token: string } | { revoked: true } | { transient: true };
+  const getValidAccessToken = async (): Promise<TokenResult> => {
     const { googleAccessToken, googleTokenExpiry, googleRefreshToken } = adminSettings;
     if (googleAccessToken && googleTokenExpiry && Date.now() < googleTokenExpiry - 60000) {
-      return googleAccessToken;
+      return { token: googleAccessToken };
     }
     if (googleRefreshToken) {
       return refreshAccessToken(googleRefreshToken);
     }
-    return null;
+    // No refresh token at all: connection is effectively dead.
+    return { revoked: true };
+  };
+
+  const markCalendarRevoked = () => {
+    setAdminSettings(prev => ({ ...prev, googleCalendarConnected: false }));
+    setDoc(doc(db, "settings", "admin"), { googleCalendarConnected: false }, { merge: true }).catch(() => {});
   };
 
   const addToGoogleCalendar = async (studentName: string, start: Date, end: Date): Promise<string | null> => {
     if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return null;
-    const token = await getValidAccessToken();
-    if (!token) {
-      // Token expired and silent refresh failed - silently mark as disconnected
-      // so the user sees the Connect button next time they open Settings
-      // without being spammed with error toasts on every booking.
-      setAdminSettings(prev => ({ ...prev, googleCalendarConnected: false }));
-      setDoc(doc(db, "settings", "admin"), { googleCalendarConnected: false }, { merge: true }).catch(() => {});
+    const result = await getValidAccessToken();
+    if ("revoked" in result) {
+      // Refresh token genuinely dead: surface it so user reconnects.
+      markCalendarRevoked();
       return null;
     }
+    if ("transient" in result) {
+      // Network blip or Google 5xx: keep connection, just skip this sync.
+      console.warn("Google Calendar sync skipped (transient token refresh failure)");
+      return null;
+    }
+    const token = result.token;
     try {
       const event = {
         summary: `English Class - ${studentName}`,
@@ -698,13 +718,17 @@ function SchedulingApp() {
 
   const removeFromGoogleCalendar = async (eventId: string) => {
     if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return;
-    const token = await getValidAccessToken();
-    if (!token) {
-      setAdminSettings(prev => ({ ...prev, googleCalendarConnected: false }));
-      setDoc(doc(db, "settings", "admin"), { googleCalendarConnected: false }, { merge: true }).catch(() => {});
-      toast.error("Google Calendar token expired - event not removed from calendar. Reconnect in Settings.");
+    const result = await getValidAccessToken();
+    if ("revoked" in result) {
+      markCalendarRevoked();
+      toast.error("Google Calendar disconnected, event not removed. Reconnect in Settings.");
       return;
     }
+    if ("transient" in result) {
+      console.warn("Google Calendar event removal skipped (transient token refresh failure)");
+      return;
+    }
+    const token = result.token;
     try {
       await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
         method: "DELETE",
