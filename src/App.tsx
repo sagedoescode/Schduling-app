@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, Component, ReactNode } from "react";
+import { useState, useEffect, useMemo, Component } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
 import { 
@@ -21,6 +22,7 @@ import {
   Moon,
   Sun,
   MoreVertical,
+  Pencil,
   Eye,
   EyeOff
 } from "lucide-react";
@@ -266,6 +268,7 @@ function SchedulingApp() {
   const [historySort, setHistorySort] = useState<"name" | "date">("date");
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
+  const [editStudentModal, setEditStudentModal] = useState<{ appointmentId: string; name: string; phone: string } | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{ appointmentId: string; selectedDay: Date | null; selectedTime: Date | null } | null>(null);
   const [rescheduleMonth, setRescheduleMonth] = useState<Date>(() => startOfMonth(new Date()));
 
@@ -384,6 +387,72 @@ function SchedulingApp() {
     } catch (error) {
       toast.error("Failed to reschedule");
       handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
+  };
+
+  const openEditStudentDetails = (id: string) => {
+    const app = appointments.find(a => a.id === id);
+    setContextMenu(null);
+    if (!app) {
+      toast.error("Class not found");
+      return;
+    }
+    setEditStudentModal({
+      appointmentId: id,
+      name: app.studentName || "",
+      phone: app.studentPhone || "",
+    });
+  };
+
+  const updateGoogleCalendarStudentSummary = async (eventId: string, studentName: string) => {
+    if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return;
+    const result = await getValidAccessToken();
+    if ("revoked" in result) {
+      markCalendarRevoked();
+      return;
+    }
+    if ("transient" in result) {
+      console.warn("Google Calendar event update skipped (transient token refresh failure)");
+      return;
+    }
+    try {
+      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${result.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ summary: `English Class - ${studentName}` }),
+      });
+      if (!res.ok) console.error("Failed to update calendar event:", await res.text());
+    } catch (e) {
+      console.error("Failed to update calendar event:", e);
+    }
+  };
+
+  const saveStudentDetails = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editStudentModal) return;
+    const name = editStudentModal.name.trim();
+    const phone = editStudentModal.phone.trim();
+    if (!name || !phone) {
+      toast.error("Name and phone are required");
+      return;
+    }
+    const app = appointments.find(a => a.id === editStudentModal.appointmentId);
+    try {
+      await updateDoc(doc(db, "appointments", editStudentModal.appointmentId), {
+        studentName: name,
+        studentPhone: phone,
+      });
+      if (app?.googleCalendarEventId && app.studentName !== name) {
+        updateGoogleCalendarStudentSummary(app.googleCalendarEventId, name);
+      }
+      toast.success("Student details updated");
+      setEditStudentModal(null);
+    } catch (error) {
+      toast.error("Failed to update student details");
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${editStudentModal.appointmentId}`);
     }
   };
 
@@ -551,7 +620,7 @@ function SchedulingApp() {
           ...d,
           startTime: toLocal(new Date(d.startTime)),
           endTime: toLocal(new Date(d.endTime))
-        } as Appointment;
+        } as unknown as Appointment;
       });
       setAppointments(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, "appointments"));
@@ -777,7 +846,7 @@ function SchedulingApp() {
     }
   };
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError("");
     if (loginEmail !== ADMIN_EMAIL) {
@@ -1826,7 +1895,7 @@ function SchedulingApp() {
       {contextMenu && (
         <div
           style={{
-            top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - 340)),
+            top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - 390)),
             left: Math.max(8, Math.min(contextMenu.x, window.innerWidth - 200)),
           }}
           onClick={(e) => e.stopPropagation()}
@@ -1865,6 +1934,9 @@ function SchedulingApp() {
           }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
             <Calendar className="w-3 h-3 text-blue-500" /> Reschedule
           </button>
+          <button onClick={() => openEditStudentDetails(contextMenu.appointmentId)} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
+            <Pencil className="w-3 h-3 text-blue-500" /> Edit student details
+          </button>
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
           {(() => {
             const app = appointments.find(a => a.id === contextMenu.appointmentId);
@@ -1892,6 +1964,76 @@ function SchedulingApp() {
           </button>
         </div>
       )}
+
+      {/* Edit Student Details Modal */}
+      <AnimatePresence>
+        {editStudentModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+            onClick={() => setEditStudentModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Edit Student Details</h2>
+                <button onClick={() => setEditStudentModal(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={saveStudentDetails} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={editStudentModal.name}
+                      onChange={(e) => setEditStudentModal(m => m ? { ...m, name: e.target.value } : null)}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Phone</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={editStudentModal.phone}
+                      onChange={(e) => setEditStudentModal(m => m ? { ...m, phone: e.target.value } : null)}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditStudentModal(null)}
+                    className="flex-1 px-4 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Reschedule Modal */}
       <AnimatePresence>
