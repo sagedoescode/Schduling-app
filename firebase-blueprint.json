@@ -29,6 +29,11 @@
           "type": "string",
           "description": "Phone number of the student"
         },
+        "studentType": {
+          "type": "string",
+          "enum": ["particular", "school"],
+          "description": "Whether the student is private/particular or school-based"
+        },
         "startTime": {
           "type": "string",
           "format": "date-time",

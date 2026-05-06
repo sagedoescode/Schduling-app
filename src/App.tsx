@@ -72,7 +72,7 @@ import {
   browserSessionPersistence
 } from "firebase/auth";
 import { db, auth, OperationType, handleFirestoreError } from "./firebase";
-import { TimeSlot, Availability, Appointment, AdminSettings, AppointmentTag } from "./types";
+import { TimeSlot, Availability, Appointment, AdminSettings, AppointmentTag, StudentType } from "./types";
 
 // Error Boundary Component
 class ErrorBoundary extends Component<any, any> {
@@ -268,7 +268,7 @@ function SchedulingApp() {
   const [historySort, setHistorySort] = useState<"name" | "date">("date");
   const [historyYear, setHistoryYear] = useState<number>(new Date().getFullYear());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; appointmentId: string } | null>(null);
-  const [editStudentModal, setEditStudentModal] = useState<{ appointmentId: string; name: string; phone: string } | null>(null);
+  const [editStudentModal, setEditStudentModal] = useState<{ appointmentId: string; studentType: StudentType } | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{ appointmentId: string; selectedDay: Date | null; selectedTime: Date | null } | null>(null);
   const [rescheduleMonth, setRescheduleMonth] = useState<Date>(() => startOfMonth(new Date()));
 
@@ -399,55 +399,17 @@ function SchedulingApp() {
     }
     setEditStudentModal({
       appointmentId: id,
-      name: app.studentName || "",
-      phone: app.studentPhone || "",
+      studentType: app.studentType || "particular",
     });
-  };
-
-  const updateGoogleCalendarStudentSummary = async (eventId: string, studentName: string) => {
-    if (!adminSettings.googleCalendarConnected || adminSettings.googleCalendarAutoSync === false) return;
-    const result = await getValidAccessToken();
-    if ("revoked" in result) {
-      markCalendarRevoked();
-      return;
-    }
-    if ("transient" in result) {
-      console.warn("Google Calendar event update skipped (transient token refresh failure)");
-      return;
-    }
-    try {
-      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${result.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ summary: `English Class - ${studentName}` }),
-      });
-      if (!res.ok) console.error("Failed to update calendar event:", await res.text());
-    } catch (e) {
-      console.error("Failed to update calendar event:", e);
-    }
   };
 
   const saveStudentDetails = async (e: FormEvent) => {
     e.preventDefault();
     if (!editStudentModal) return;
-    const name = editStudentModal.name.trim();
-    const phone = editStudentModal.phone.trim();
-    if (!name || !phone) {
-      toast.error("Name and phone are required");
-      return;
-    }
-    const app = appointments.find(a => a.id === editStudentModal.appointmentId);
     try {
       await updateDoc(doc(db, "appointments", editStudentModal.appointmentId), {
-        studentName: name,
-        studentPhone: phone,
+        studentType: editStudentModal.studentType,
       });
-      if (app?.googleCalendarEventId && app.studentName !== name) {
-        updateGoogleCalendarStudentSummary(app.googleCalendarEventId, name);
-      }
       toast.success("Student details updated");
       setEditStudentModal(null);
     } catch (error) {
@@ -481,6 +443,7 @@ function SchedulingApp() {
           status: "booked",
           tag: source.tag ?? null,
           classType: source.classType ?? null,
+          studentType: source.studentType ?? null,
           recurring: true,
           createdAt: serverTimestamp()
         });
@@ -1562,6 +1525,9 @@ function SchedulingApp() {
                                     <div className="font-bold text-sm">{format(app.startTime, "HH:mm")} <span className="text-[10px] font-medium opacity-70">({durMin}m)</span></div>
                                     <div className="font-medium text-slate-700 dark:text-slate-200 truncate">{app.studentName}</div>
                                     <div className="text-slate-500 dark:text-slate-400 text-[10px] truncate">{app.studentPhone}</div>
+                                    {app.studentType && (
+                                      <div className="text-[9px] font-bold uppercase tracking-wider mt-1 opacity-70">{app.studentType}</div>
+                                    )}
                                     {outcome ? (
                                       <>
                                         <div className="text-[10px] font-bold uppercase tracking-wider mt-1">{outcome.replace("-", " ")}</div>
@@ -1763,6 +1729,9 @@ function SchedulingApp() {
                             <div>
                               <div className="font-bold text-slate-900 dark:text-slate-100">{app.studentName}</div>
                               <div className="text-xs text-slate-500 dark:text-slate-400">{format(app.startTime, "HH:mm")} · {app.studentPhone}</div>
+                              {app.studentType && (
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5">{app.studentType}</div>
+                              )}
                             </div>
                           </div>
                           <div className="flex flex-col items-end font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -1990,28 +1959,26 @@ function SchedulingApp() {
               </div>
               <form onSubmit={saveStudentDetails} className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="text"
-                      value={editStudentModal.name}
-                      onChange={(e) => setEditStudentModal(m => m ? { ...m, name: e.target.value } : null)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                      autoFocus
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block">Phone</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="tel"
-                      value={editStudentModal.phone}
-                      onChange={(e) => setEditStudentModal(m => m ? { ...m, phone: e.target.value } : null)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                    />
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 block">Student type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["particular", "school"] as StudentType[]).map(type => {
+                      const selected = editStudentModal.studentType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setEditStudentModal(m => m ? { ...m, studentType: type } : null)}
+                          className={`px-4 py-3 rounded-xl border text-sm font-bold capitalize transition-all ${
+                            selected
+                              ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
+                              : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500"
+                          }`}
+                          autoFocus={selected}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="flex gap-3 pt-2">
